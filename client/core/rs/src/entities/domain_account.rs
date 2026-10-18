@@ -122,6 +122,29 @@ pub struct DomainProviderKind {
   pub params_example: JsonValue,
 }
 
+/// What a provider token can see. Vendor neutral.
+#[typeshare]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct DomainDiscovery {
+  /// DNS zone names.
+  pub zones: Vec<String>,
+  /// Tunnels / entrypoints that can receive ingress rules.
+  pub ingresses: Vec<DiscoveredIngress>,
+  /// Non fatal problems, eg. a missing permission.
+  pub warnings: Vec<String>,
+}
+
+#[typeshare]
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct DiscoveredIngress {
+  /// Provider id (eg. tunnel id).
+  pub id: String,
+  pub name: String,
+  /// Provider container (eg. Cloudflare account id).
+  pub account_id: Option<String>,
+  pub status: Option<String>,
+}
+
 #[cfg(test)]
 mod tests {
   use crate::entities::config::core::CoreConfig;

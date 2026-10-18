@@ -230,6 +230,76 @@ impl CloudflareClient {
     )
   }
 
+  /// GET every page of a list endpoint. `path` may already hold a query.
+  async fn list_pages(
+    &self,
+    path: &str,
+    what: &str,
+  ) -> Result<Vec<Value>> {
+    let sep = if path.contains('?') { '&' } else { '?' };
+    let mut all = Vec::new();
+    for page in 1..=200 {
+      let data = self
+        .request(
+          Method::GET,
+          &format!("{path}{sep}per_page=50&page={page}"),
+          None,
+        )
+        .await?;
+      let items = data["result"].as_array().ok_or_else(|| {
+        malformed(&format!("{what} result is not an array"))
+      })?;
+      all.extend(items.iter().cloned());
+      if items.len() < 50
+        || data["result_info"]["total_pages"]
+          .as_u64()
+          .is_some_and(|n| page >= n)
+      {
+        return Ok(all);
+      }
+    }
+    Err(
+      ProviderError::new(
+        code::PROVIDER_RESPONSE,
+        "Pagination limit exceeded",
+      )
+      .with_detail(format!("more than 200 pages of {what}")),
+    )
+  }
+
+  /// `(id, name)` of the Cloudflare accounts the token can access.
+  pub async fn list_accounts(&self) -> Result<Vec<(String, String)>> {
+    Ok(
+      self
+        .list_pages("/accounts", "accounts")
+        .await?
+        .iter()
+        .filter_map(|a| {
+          Some((
+            a["id"].as_str()?.to_string(),
+            a["name"].as_str().unwrap_or_default().to_string(),
+          ))
+        })
+        .collect(),
+    )
+  }
+
+  /// Non deleted tunnels of an account (raw objects).
+  pub async fn list_tunnels(
+    &self,
+    account: &str,
+  ) -> Result<Vec<Value>> {
+    self
+      .list_pages(
+        &format!(
+          "/accounts/{}/cfd_tunnel?is_deleted=false",
+          segment(account)?
+        ),
+        "tunnels",
+      )
+      .await
+  }
+
   /// DNS records named exactly `hostname`.
   pub async fn list_dns(
     &self,

@@ -218,3 +218,42 @@ async fn dns_http_retries_get_and_sanitizes_authorization_errors() {
   let rendered = format!("{error} {error:?}");
   assert!(!rendered.contains("fixture-secret"));
 }
+
+#[tokio::test]
+async fn discover_lists_zones_tunnels_and_warns_on_missing_permission()
+ {
+  let fixture = Fixture::start(|request| {
+    assert_eq!(request.method, "GET");
+    let path = request.path.as_str();
+    if path.starts_with("/zones") {
+      Response::ok(json!([{ "id": "z1", "name": "Example.com" }]))
+    } else if path.starts_with("/accounts?") {
+      Response::ok(json!([
+        { "id": "acc1", "name": "Main" },
+        { "id": "acc2", "name": "Other" }
+      ]))
+    } else if path
+      .starts_with("/accounts/acc1/cfd_tunnel?is_deleted=false")
+    {
+      Response::ok(json!([
+        { "id": "t1", "name": "home", "status": "healthy" }
+      ]))
+    } else {
+      Response::error(403)
+    }
+  })
+  .await;
+  let found = super::super::cloudflare::discover_with(
+    &fixture.client(Duration::from_secs(2)),
+  )
+  .await
+  .unwrap();
+  assert_eq!(found.zones, vec!["example.com"]);
+  assert_eq!(found.ingresses.len(), 1);
+  assert_eq!(found.ingresses[0].id, "t1");
+  assert_eq!(found.ingresses[0].account_id.as_deref(), Some("acc1"));
+  assert_eq!(found.ingresses[0].status.as_deref(), Some("healthy"));
+  assert_eq!(found.warnings.len(), 1);
+  assert!(found.warnings[0].contains("Other"));
+  assert!(!format!("{found:?}").contains("fixture-secret"));
+}

@@ -1,3 +1,5 @@
+use std::fmt;
+
 use mogh_resolver::Resolve;
 use serde::{Deserialize, Serialize};
 use typeshare::typeshare;
@@ -5,7 +7,9 @@ use typeshare::typeshare;
 use crate::entities::{
   U64,
   domain::{Domain, DomainListItem, DomainPlan, DomainQuery},
-  domain_account::{DomainAccount, DomainProviderKind},
+  domain_account::{
+    DomainAccount, DomainDiscovery, DomainProviderKind,
+  },
 };
 
 use super::KomodoReadRequest;
@@ -134,3 +138,37 @@ pub struct GetDomainAccount {
 
 #[typeshare]
 pub type GetDomainAccountResponse = DomainAccount;
+
+//
+
+/// **Admin only.** List the zones and tunnels a provider token can see
+/// (read only, nothing is saved). Pass `account` to use a saved token, or
+/// `kind` + `token` to preview before creating the account.
+/// Response: [DomainDiscovery].
+#[typeshare]
+#[derive(Serialize, Deserialize, Clone, Resolve)]
+#[empty_traits(KomodoReadRequest)]
+#[response(DiscoverDomainAccountResponse)]
+#[error(mogh_error::Error)]
+pub struct DiscoverDomainAccount {
+  /// Id or name of a saved account.
+  pub account: Option<String>,
+  /// Provider kind, used with `token` when `account` is not set.
+  pub kind: Option<String>,
+  /// Unsaved provider token.
+  pub token: Option<String>,
+}
+
+#[typeshare]
+pub type DiscoverDomainAccountResponse = DomainDiscovery;
+
+// No derived Debug, so the token can't be logged.
+impl fmt::Debug for DiscoverDomainAccount {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    f.debug_struct("DiscoverDomainAccount")
+      .field("account", &self.account)
+      .field("kind", &self.kind)
+      .field("token", &self.token.as_ref().map(|_| "***"))
+      .finish()
+  }
+}

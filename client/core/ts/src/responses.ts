@@ -155,6 +155,7 @@ export type ReadResponses = {
   ListDomainProviderKinds: Types.ListDomainProviderKindsResponse;
   ListDomainAccounts: Types.ListDomainAccountsResponse;
   GetDomainAccount: Types.GetDomainAccountResponse;
+  DiscoverDomainAccount: Types.DiscoverDomainAccountResponse;
 
   // ==== TOML ====
   ExportAllResourcesToToml: Types.ExportAllResourcesToTomlResponse;

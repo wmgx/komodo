@@ -56,7 +56,7 @@ DomainConfig {
 
 ## 3. 厂商抽象
 
-`bin/core/src/domain/provider/`：`DnsProvider` / `IngressProvider` trait + `ProviderFactory{kind, capabilities, params_example, validate_params, build}` + 注册表。`cloudflare.rs` 同时提供两种能力，共用 `cloudflare_client.rs`（25s 超时、禁重定向、仅 GET 重试、不泄露响应体、无 Debug）。`tunnel_merge.rs` 负责「读整条隧道配置 → 合并单个 hostname 规则 → 写回」，保留未知字段与 catch-all。
+`bin/core/src/domain/provider/`：`DnsProvider` / `IngressProvider` trait + `ProviderFactory{kind, capabilities, params_example, validate_params, build, discover?}`（`discover` 为可选的只读发现能力，不支持的厂商返回明确错误） + 注册表。`cloudflare.rs` 同时提供两种能力，共用 `cloudflare_client.rs`（25s 超时、禁重定向、仅 GET 重试、不泄露响应体、无 Debug）。`tunnel_merge.rs` 负责「读整条隧道配置 → 合并单个 hostname 规则 → 写回」，保留未知字段与 catch-all。
 
 新增厂商：新增 `provider/<kind>.rs` 并在注册表加一行；`ListDomainProviderKinds` 返回 kind、capabilities、params 示例，UI 与 AI 由此发现。
 
@@ -85,7 +85,7 @@ DomainConfig {
 
 | 类别 | 请求 |
 |---|---|
-| Read | `GetDomain` `ListDomains`（含 status_code）`ListFullDomains` `GetDomainPlan{domain}` `ListDomainProviderKinds` `ListDomainAccounts` `GetDomainAccount` |
+| Read | `GetDomain` `ListDomains`（含 status_code）`ListFullDomains` `GetDomainPlan{domain}` `ListDomainProviderKinds` `ListDomainAccounts` `GetDomainAccount` `DiscoverDomainAccount{account?\|(kind,token)?}`（仅管理员，只读，返回 `{zones, ingresses[{id,name,account_id?,status?}], warnings}`；token 不进日志/响应） |
 | Write | `CreateDomain` `CopyDomain` `UpdateDomain` `RenameDomain` `DeleteDomain` `CreateDomainAccount{name,kind,token,params,description}` `UpdateDomainAccount{id,token?,params?,description?}` `DeleteDomainAccount{id}` |
 | Execute | `ApplyDomain{domain, plan_id?, adopt_conflicts}`（同时是 Procedure 的 Execution） |
 
@@ -97,7 +97,7 @@ DomainConfig {
 ## 8. 已知限制
 
 1. 每个 Domain 只有一条 DNS 记录和一条隧道规则；一个 hostname 要多条记录需多个 Domain 或手工管理。
-2. 仅支持 Cloudflare 远程管理的命名隧道；隧道需在账号 `params.tunnels` 手工登记。
+2. 仅支持 Cloudflare 远程管理的命名隧道；隧道通过 `DiscoverDomainAccount` 列出后在 UI 勾选，登记到账号 `params.tunnels`。
 3. apply 超时取消后，隧道规则可能已写入但未记入 `info.owned`，下次 plan 会把它识别为 Conflict，需要 `--adopt-conflicts` 接管。
 4. 账号仍被 Domain 配置或 `info.owned` 引用时无法删除；需先删除 Domain（`Cleanup` 清远端，或把 `on_delete` 改为 `Retain` 保留远端），再删账号。
 5. token 以明文存于 Mongo（与上游 Git/镜像仓库 token 同等安全级别），不做静态加密。

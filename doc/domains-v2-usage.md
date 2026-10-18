@@ -8,36 +8,25 @@ Cloudflare 控制台 -> My Profile -> API Tokens -> Create Custom Token，最小
 
 | 范围 | 权限 |
 |---|---|
-| Zone -> Zone | Read |
-| Zone -> DNS | Edit |
-| Account -> Cloudflare Tunnel | Edit |
+| 区域 -> 区域 | 读取 |
+| 区域 -> DNS | 编辑 |
+| 帐户 -> Cloudflare Tunnel | 编辑 |
 
-- Zone Resources：Include -> Specific zone -> 只选目标 zone（如 `example.com`）。
-- Account Resources：只选隧道所在的账号。
-另需记下：Cloudflare Account ID，以及隧道的 Tunnel ID（Zero Trust -> Networks -> Tunnels，必须是远程管理的隧道）。
+- 区域资源：包括 -> 特定区域 -> 只选目标 zone（如 `example.com`）。
+- 帐户资源：只选隧道所在的账号。
+- 只用 DNS、不用隧道时可不加「Cloudflare Tunnel」；发现时会提示缺少隧道权限，不影响保存。
 
 ## 2. 在 UI 创建 Domain 账号（需管理员）
 
-Settings -> Domains -> New Account：
+Settings -> Domains -> New Account，不需要手写 JSON：
 
-- Name：`cf-main`，Kind：`cloudflare`，Token：粘贴上一步的 token（保存后不再显示）。
-- Params（可点 Fill example）：
+1. 填 Name（如 `cf-main`）、Kind 选 `cloudflare`、Token 粘贴上一步的 token（保存后不再显示）。
+2. 点「Read from Cloudflare」（用表单里的 token 预览，此时不会保存任何东西）。
+3. Zones：勾选允许使用的 zone；一个都不勾表示不限制，token 能访问的 zone 都可用。
+4. Tunnels：勾选要启用的隧道，本地名称默认取 Cloudflare 上的隧道名，可修改；可选绑定它所在的 Komodo Server（用于按 Deployment/Stack 所在 Server 自动选隧道，只有一条隧道时可不选）。账号 ID、隧道 ID 自动填写。
+5. 点 Create。读取失败或有警告（如缺少隧道权限）时，仍可保存并只使用 DNS。
 
-```json
-{
-  "zones": ["example.com"],
-  "tunnels": [
-    {
-      "name": "home",
-      "account_id": "<Cloudflare Account ID>",
-      "tunnel_id": "<Tunnel UUID>",
-      "server": "<该隧道所在的 Komodo Server 名>"
-    }
-  ]
-}
-```
-
-`server` 用于按 Deployment/Stack 所在 Server 自动选隧道；只有一条隧道时可省略。
+之后编辑账号会自动用已保存的 token 重新读取；Token 留空表示不修改。非 Cloudflare 的 Kind（无结构化表单）才会显示折叠的「Advanced: params (JSON)」。
 
 ## 3. 创建 Domain 并 plan / apply
 

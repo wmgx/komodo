@@ -2,7 +2,7 @@
 //!
 //! One account (one API token) provides both capabilities.
 //!
-//! Account `params`:
+//! Account `params` (the UI fills them from the discovery result):
 //! ```json
 //! {
 //!   "zones": ["example.com"],
@@ -19,8 +19,8 @@ use std::sync::Arc;
 use komodo_client::entities::{
   JsonValue,
   domain::{DnsRecordType, DomainLayer, OwnedObject},
+  domain_account::{DiscoveredIngress, DomainDiscovery},
 };
-use serde::Deserialize;
 use serde_json::{Value, json};
 
 use crate::domain::error::{ProviderError, code};
@@ -39,35 +39,102 @@ pub const FACTORY: ProviderFactory = ProviderFactory {
   params_example,
   validate_params,
   build,
+  discover: Some(discover),
 };
 
 fn params_example() -> JsonValue {
-  json!({
-    "zones": ["example.com"],
-    "tunnels": [{
-      "name": "home",
-      "account_id": "<cloudflare account id>",
-      "tunnel_id": "<tunnel uuid>",
-      "server": "<optional komodo server name or id>"
-    }]
+  json!({ "zones": [], "tunnels": [] })
+}
+
+/// Lists zones and tunnels visible to the token. A missing permission
+/// for tunnels only produces a warning, so DNS-only tokens still work.
+fn discover(token: String) -> BoxFut<'static, DomainDiscovery> {
+  Box::pin(async move {
+    let client = CloudflareClient::new(&token)?;
+    discover_with(&client).await
   })
 }
 
-#[derive(Deserialize, Default, Clone)]
+pub(super) async fn discover_with(
+  client: &CloudflareClient,
+) -> Result<DomainDiscovery, ProviderError> {
+  let mut zones: Vec<String> = client
+    .list_zones()
+    .await?
+    .into_iter()
+    .map(|z| z.name)
+    .collect();
+  zones.sort();
+  zones.dedup();
+  let mut out = DomainDiscovery {
+    zones,
+    ..Default::default()
+  };
+  let accounts = match client.list_accounts().await {
+    Ok(accounts) => accounts,
+    Err(e) if e.code == code::AUTH_FAILED => {
+      out.warnings.push(
+        "token 缺少读取 Cloudflare 账号的权限，无法列出隧道".into(),
+      );
+      return Ok(out);
+    }
+    Err(e) => return Err(e),
+  };
+  for (account_id, account_name) in accounts {
+    match client.list_tunnels(&account_id).await {
+      Ok(tunnels) => {
+        out.ingresses.extend(tunnels.iter().filter_map(|t| {
+          Some(DiscoveredIngress {
+            id: t["id"].as_str()?.to_string(),
+            name: t["name"].as_str()?.to_string(),
+            account_id: Some(account_id.clone()),
+            status: t["status"].as_str().map(str::to_string),
+          })
+        }));
+      }
+      Err(e) if e.code == code::AUTH_FAILED => {
+        out.warnings.push(format!(
+          "token 缺少 Cloudflare Tunnel 权限，无法列出账号 {account_name} 的隧道"
+        ));
+      }
+      Err(e) => return Err(e),
+    }
+  }
+  Ok(out)
+}
+
+#[derive(Default, Clone)]
 struct CloudflareParams {
-  #[serde(default)]
   zones: Vec<String>,
-  #[serde(default)]
   tunnels: Vec<TunnelEntry>,
 }
 
-#[derive(Deserialize, Clone)]
+#[derive(Clone)]
 struct TunnelEntry {
   name: String,
   account_id: String,
   tunnel_id: String,
-  #[serde(default)]
   server: Option<String>,
+}
+
+/// Required, non-empty string field of tunnel entry `n` (1 based).
+fn tunnel_field(
+  entry: &serde_json::Map<String, Value>,
+  n: usize,
+  key: &str,
+) -> Result<String, ProviderError> {
+  match entry.get(key) {
+    None | Some(Value::Null) => {
+      Err(ProviderError::invalid(format!("隧道 #{n} 缺少 {key}")))
+    }
+    Some(Value::String(s)) if s.trim().is_empty() => {
+      Err(ProviderError::invalid(format!("隧道 #{n} 的 {key} 为空")))
+    }
+    Some(Value::String(s)) => Ok(s.clone()),
+    Some(_) => Err(ProviderError::invalid(format!(
+      "隧道 #{n} 的 {key} 必须是字符串"
+    ))),
+  }
 }
 
 fn parse_params(
@@ -76,27 +143,76 @@ fn parse_params(
   if params.is_null() {
     return Ok(CloudflareParams::default());
   }
-  CloudflareParams::deserialize(params).map_err(|e| {
-    ProviderError::invalid(format!("Invalid cloudflare params: {e}"))
-  })
+  let Some(obj) = params.as_object() else {
+    return Err(ProviderError::invalid("params 必须是 JSON 对象"));
+  };
+  let list = |key: &str| match obj.get(key) {
+    None | Some(Value::Null) => Ok(&[][..]),
+    Some(Value::Array(a)) => Ok(a.as_slice()),
+    Some(_) => {
+      Err(ProviderError::invalid(format!("{key} 必须是数组")))
+    }
+  };
+  let mut zones = Vec::new();
+  for (i, zone) in list("zones")?.iter().enumerate() {
+    match zone.as_str().map(str::trim) {
+      Some(z) if !z.is_empty() => zones.push(z.to_string()),
+      _ => {
+        return Err(ProviderError::invalid(format!(
+          "zones #{} 必须是非空字符串",
+          i + 1
+        )));
+      }
+    }
+  }
+  let mut tunnels = Vec::new();
+  for (i, tunnel) in list("tunnels")?.iter().enumerate() {
+    let n = i + 1;
+    let Some(entry) = tunnel.as_object() else {
+      return Err(ProviderError::invalid(format!(
+        "隧道 #{n} 必须是对象"
+      )));
+    };
+    tunnels.push(TunnelEntry {
+      name: tunnel_field(entry, n, "name")?,
+      account_id: tunnel_field(entry, n, "account_id")?,
+      tunnel_id: tunnel_field(entry, n, "tunnel_id")?,
+      server: match entry.get("server") {
+        None | Some(Value::Null) => None,
+        Some(Value::String(s)) if !s.is_empty() => Some(s.clone()),
+        Some(Value::String(_)) => None,
+        Some(_) => {
+          return Err(ProviderError::invalid(format!(
+            "隧道 #{n} 的 server 必须是字符串"
+          )));
+        }
+      },
+    });
+  }
+  Ok(CloudflareParams { zones, tunnels })
 }
 
 fn validate_params(params: &JsonValue) -> Result<(), ProviderError> {
   let params = parse_params(params)?;
-  if params.zones.iter().any(|z| z.trim().is_empty()) {
-    return Err(ProviderError::invalid("Empty entry in 'zones'"));
-  }
   let mut names = std::collections::HashSet::new();
-  for tunnel in &params.tunnels {
-    if tunnel.name.trim().is_empty()
-      || !names.insert(tunnel.name.as_str())
-    {
-      return Err(ProviderError::invalid(
-        "Tunnel names must be non-empty and unique",
-      ));
+  for (i, tunnel) in params.tunnels.iter().enumerate() {
+    let n = i + 1;
+    if !names.insert(tunnel.name.as_str()) {
+      return Err(ProviderError::invalid(format!(
+        "隧道名称重复：{}",
+        tunnel.name
+      )));
     }
-    segment(&tunnel.account_id)?;
-    segment(&tunnel.tunnel_id)?;
+    for (key, value) in [
+      ("account_id", &tunnel.account_id),
+      ("tunnel_id", &tunnel.tunnel_id),
+    ] {
+      if segment(value).is_err() {
+        return Err(ProviderError::invalid(format!(
+          "隧道 #{n} 的 {key} 含非法字符，请从列表中选择"
+        )));
+      }
+    }
   }
   Ok(())
 }
@@ -517,5 +633,29 @@ mod tests {
     let err =
       match_zone(&zones, &[], "app.notexample.com").unwrap_err();
     assert_eq!(err.code, "ZoneNotFound");
+  }
+
+  #[test]
+  fn params_errors_name_the_field() {
+    let err = |v: Value| validate_params(&v).unwrap_err().message;
+    assert_eq!(
+      err(
+        json!({"tunnels": [{"account_id": "a", "tunnel_id": "t"}]})
+      ),
+      "隧道 #1 缺少 name"
+    );
+    assert!(
+      err(json!({"tunnels": [
+        {"name": "ok", "account_id": "a", "tunnel_id": "t"},
+        {"name": "x", "account_id": "a", "tunnel_id": "<tunnel uuid>"}
+      ]}))
+      .starts_with("隧道 #2 的 tunnel_id 含非法字符")
+    );
+    assert!(err(json!({"zones": "a.com"})).contains("zones"));
+    // DNS only is fine
+    assert!(validate_params(&json!({})).is_ok());
+    assert!(
+      validate_params(&json!({"zones": [], "tunnels": []})).is_ok()
+    );
   }
 }

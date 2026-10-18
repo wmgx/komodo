@@ -1728,6 +1728,24 @@ export interface DeploymentQuerySpecifics {
     states?: DeploymentState[];
 }
 export type DeploymentQuery = ResourceQuery<DeploymentQuerySpecifics>;
+export interface DiscoveredIngress {
+    /** Provider id (eg. tunnel id). */
+    id: string;
+    name: string;
+    /** Provider container (eg. Cloudflare account id). */
+    account_id?: string;
+    status?: string;
+}
+/** What a provider token can see. Vendor neutral. */
+export interface DomainDiscovery {
+    /** DNS zone names. */
+    zones: string[];
+    /** Tunnels / entrypoints that can receive ingress rules. */
+    ingresses: DiscoveredIngress[];
+    /** Non fatal problems, eg. a missing permission. */
+    warnings: string[];
+}
+export type DiscoverDomainAccountResponse = DomainDiscovery;
 export declare enum DnsRecordType {
     A = "A",
     AAAA = "AAAA",
@@ -7736,6 +7754,20 @@ export interface DiscordAlerterEndpoint {
     /** The Discord webhook url */
     url: string;
 }
+/**
+ * **Admin only.** List the zones and tunnels a provider token can see
+ * (read only, nothing is saved). Pass `account` to use a saved token, or
+ * `kind` + `token` to preview before creating the account.
+ * Response: [DomainDiscovery].
+ */
+export interface DiscoverDomainAccount {
+    /** Id or name of a saved account. */
+    account?: string;
+    /** Provider kind, used with `token` when `account` is not set. */
+    kind?: string;
+    /** Unsaved provider token. */
+    token?: string;
+}
 /** Standard docker lists available from a Server. */
 export interface DockerLists {
     containers: ContainerListItem[];
@@ -12306,6 +12338,9 @@ export type ReadRequest = {
 } | {
     type: "GetDomainAccount";
     params: GetDomainAccount;
+} | {
+    type: "DiscoverDomainAccount";
+    params: DiscoverDomainAccount;
 } | {
     type: "ExportAllResourcesToToml";
     params: ExportAllResourcesToToml;

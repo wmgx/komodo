@@ -2,7 +2,9 @@ use komodo_client::{
   api::read::*,
   entities::{
     domain::{Domain, DomainListItem, DomainPlan},
-    domain_account::{DomainAccount, DomainProviderKind},
+    domain_account::{
+      DomainAccount, DomainDiscovery, DomainProviderKind,
+    },
     permission::PermissionLevel,
   },
 };
@@ -11,7 +13,11 @@ use mogh_resolver::Resolve;
 use reqwest::StatusCode;
 
 use crate::{
-  domain::{accounts, prepare::plan_domain, provider::REGISTRY},
+  domain::{
+    accounts,
+    prepare::plan_domain,
+    provider::{REGISTRY, factory},
+  },
   helpers::query::get_all_tags,
   permission::get_check_permissions,
   resource,
@@ -167,5 +173,58 @@ impl Resolve<ReadArgs> for GetDomainAccount {
         )
         .status_code(StatusCode::NOT_FOUND)
       })
+  }
+}
+
+impl Resolve<ReadArgs> for DiscoverDomainAccount {
+  #[instrument(
+    "DiscoverDomainAccount",
+    skip_all,
+    fields(operator = user.id)
+  )]
+  async fn resolve(
+    self,
+    ReadArgs { user }: &ReadArgs,
+  ) -> mogh_error::Result<DomainDiscovery> {
+    if !user.admin {
+      return Err(
+        anyhow::anyhow!("Only admins can read domain accounts")
+          .status_code(StatusCode::FORBIDDEN),
+      );
+    }
+    let bad = |msg: &str| {
+      anyhow::anyhow!("{msg}").status_code(StatusCode::BAD_REQUEST)
+    };
+    let (kind, token) = match self.account.filter(|a| !a.is_empty()) {
+      Some(account) => {
+        let account = accounts::find_by_id_or_name(&account)
+          .await
+          .map_err(|e| e.into_api())?
+          .ok_or_else(|| {
+            anyhow::anyhow!("No domain account matching '{account}'")
+              .status_code(StatusCode::NOT_FOUND)
+          })?;
+        (account.kind, account.token)
+      }
+      None => (
+        self.kind.unwrap_or_default(),
+        self.token.unwrap_or_default(),
+      ),
+    };
+    if token.is_empty() {
+      return Err(bad("Provide a saved account, or kind and token"));
+    }
+    let factory = factory(&kind).ok_or_else(|| {
+      bad(&format!("Unknown provider kind '{kind}'"))
+    })?;
+    let Some(discover) = factory.discover else {
+      return Err(bad(&format!(
+        "Provider kind '{kind}' does not support discovery"
+      )));
+    };
+    discover(token).await.map_err(|e| {
+      e.log("DiscoverDomainAccount");
+      e.into_api()
+    })
   }
 }

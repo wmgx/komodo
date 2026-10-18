@@ -250,6 +250,7 @@ enum ReadRequest {
   ListDomainProviderKinds(ListDomainProviderKinds),
   ListDomainAccounts(ListDomainAccounts),
   GetDomainAccount(GetDomainAccount),
+  DiscoverDomainAccount(DiscoverDomainAccount),
 
   // ==== TOML ====
   ExportAllResourcesToToml(ExportAllResourcesToToml),

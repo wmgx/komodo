@@ -8,6 +8,7 @@ use std::{fmt, future::Future, pin::Pin};
 use komodo_client::entities::{
   JsonValue,
   domain::{DnsRecordType, DomainLayer, OwnedObject},
+  domain_account::DomainDiscovery,
 };
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -226,6 +227,10 @@ pub struct ProviderFactory {
   /// Validate account params. No network.
   pub validate_params: fn(&JsonValue) -> Result<(), ProviderError>,
   pub build: fn(Credentials) -> Result<ProviderSet, ProviderError>,
+  /// Optional: list the zones / ingresses a token can see (read only),
+  /// so the UI can offer a pick list instead of free text.
+  pub discover:
+    Option<fn(String) -> BoxFut<'static, DomainDiscovery>>,
 }
 
 /// Add new vendors here.
