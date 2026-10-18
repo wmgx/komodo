@@ -1,3 +1,4 @@
+use komodo_client::entities::domain::{DnsProvider, Domain, Ingress};
 use std::{collections::HashMap, future::Future};
 
 use anyhow::{Context, anyhow};
@@ -96,7 +97,7 @@ pub fn get_user_permission_on_resource<'a, T: KomodoResource>(
 
     let resource_type = T::resource_type();
     let resource = get::<T>(resource_id).await?;
-    let initial_specific = if let Some(additional_target) =
+    let mut initial_specific = if let Some(additional_target) =
       T::inherit_specific_permissions_from(&resource)
       // Ensure target is actually assigned
       && !additional_target.is_empty()
@@ -113,6 +114,9 @@ pub fn get_user_permission_on_resource<'a, T: KomodoResource>(
       IndexSet::new()
     };
 
+    // Publishing requires authorization on the target itself; do not inherit
+    // AttachDomain from its hosting Server or another related resource.
+    initial_specific.shift_remove(&SpecificPermission::AttachDomain);
     let mut permission = PermissionLevelAndSpecifics {
       level: if core_config().transparent_mode {
         PermissionLevel::Read
@@ -338,7 +342,11 @@ impl ListPermits {
         specific
       }
     };
-    perm.specific.extend(additional_specific);
+    perm.specific.extend(
+      additional_specific
+        .into_iter()
+        .filter(|p| *p != SpecificPermission::AttachDomain),
+    );
     Ok(perm.fulfills(&fine.required))
   }
 }
@@ -459,6 +467,9 @@ pub async fn user_resource_target_query(
   if user.admin || core_config().transparent_mode {
     Ok(incoming_query)
   } else {
+    let domain_query = list_resource_ids_for_user::<Domain>(None,None,None,user,PermissionLevel::Read.into()).await?.map(|ids| doc! { "target.type": "Domain", "target.id": { "$in": ids } }).unwrap_or_else(|| doc! { "target.type":"Domain" });
+    let dns_provider_query = list_resource_ids_for_user::<DnsProvider>(None,None,None,user,PermissionLevel::Read.into()).await?.map(|ids| doc! { "target.type": "DnsProvider", "target.id": { "$in": ids } }).unwrap_or_else(|| doc! { "target.type":"DnsProvider" });
+    let ingress_query = list_resource_ids_for_user::<Ingress>(None,None,None,user,PermissionLevel::Read.into()).await?.map(|ids| doc! { "target.type": "Ingress", "target.id": { "$in": ids } }).unwrap_or_else(|| doc! { "target.type":"Ingress" });
     let swarm_query = list_resource_ids_for_user::<Swarm>(
       None,
       None,
@@ -634,7 +645,8 @@ pub async fn user_resource_target_query(
         "$and": [
           {
             "$or": [
-              swarm_query,
+              domain_query, dns_provider_query, ingress_query,
+          swarm_query,
               server_query,
               stack_query,
               deployment_query,
@@ -653,6 +665,7 @@ pub async fn user_resource_target_query(
     } else {
       doc! {
         "$or": [
+          domain_query, dns_provider_query, ingress_query,
           swarm_query,
           server_query,
           stack_query,
@@ -678,6 +691,26 @@ pub async fn check_user_target_access(
   required_permissions: PermissionLevelAndSpecifics,
 ) -> anyhow::Result<()> {
   match target {
+    ResourceTarget::Domain(id) => {
+      get_check_permissions::<Domain>(id, user, required_permissions)
+        .await?;
+    }
+    ResourceTarget::DnsProvider(id) => {
+      get_check_permissions::<DnsProvider>(
+        id,
+        user,
+        required_permissions,
+      )
+      .await?;
+    }
+    ResourceTarget::Ingress(id) => {
+      get_check_permissions::<Ingress>(
+        id,
+        user,
+        required_permissions,
+      )
+      .await?;
+    }
     ResourceTarget::System(_) => {
       return Err(anyhow!(
         "user must be admin to view system updates"

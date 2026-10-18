@@ -64,6 +64,22 @@ export var MaintenanceScheduleType;
 })(MaintenanceScheduleType || (MaintenanceScheduleType = {}));
 export var Operation;
 (function (Operation) {
+    Operation["RenameDomain"] = "RenameDomain";
+    Operation["RenameDnsProvider"] = "RenameDnsProvider";
+    Operation["RenameIngress"] = "RenameIngress";
+    Operation["CreateDomain"] = "CreateDomain";
+    Operation["UpdateDomain"] = "UpdateDomain";
+    Operation["DeleteDomain"] = "DeleteDomain";
+    Operation["ReconcileDomain"] = "ReconcileDomain";
+    Operation["RemoveDomain"] = "RemoveDomain";
+    Operation["MigrateDomain"] = "MigrateDomain";
+    Operation["FinalizeDomainMigration"] = "FinalizeDomainMigration";
+    Operation["CreateDnsProvider"] = "CreateDnsProvider";
+    Operation["UpdateDnsProvider"] = "UpdateDnsProvider";
+    Operation["DeleteDnsProvider"] = "DeleteDnsProvider";
+    Operation["CreateIngress"] = "CreateIngress";
+    Operation["UpdateIngress"] = "UpdateIngress";
+    Operation["DeleteIngress"] = "DeleteIngress";
     Operation["None"] = "None";
     Operation["CreateSwarm"] = "CreateSwarm";
     Operation["UpdateSwarm"] = "UpdateSwarm";
@@ -272,6 +288,43 @@ export var DeploymentState;
     /** Server / Swarm not reachable for status */
     DeploymentState["Unknown"] = "unknown";
 })(DeploymentState || (DeploymentState = {}));
+export var SecretSource;
+(function (SecretSource) {
+    SecretSource["CoreSecret"] = "CoreSecret";
+})(SecretSource || (SecretSource = {}));
+export var TlsMode;
+(function (TlsMode) {
+    TlsMode["RequireHttps"] = "RequireHttps";
+    TlsMode["HttpOnly"] = "HttpOnly";
+})(TlsMode || (TlsMode = {}));
+export var ReconcileMode;
+(function (ReconcileMode) {
+    ReconcileMode["Manual"] = "Manual";
+    ReconcileMode["Automatic"] = "Automatic";
+})(ReconcileMode || (ReconcileMode = {}));
+export var DomainState;
+(function (DomainState) {
+    DomainState["Pending"] = "Pending";
+    DomainState["Applying"] = "Applying";
+    DomainState["Ready"] = "Ready";
+    DomainState["Degraded"] = "Degraded";
+    DomainState["Blocked"] = "Blocked";
+    DomainState["Deleting"] = "Deleting";
+})(DomainState || (DomainState = {}));
+export var DomainConditionType;
+(function (DomainConditionType) {
+    DomainConditionType["TargetResolved"] = "TargetResolved";
+    DomainConditionType["IngressReady"] = "IngressReady";
+    DomainConditionType["DnsConfigured"] = "DnsConfigured";
+    DomainConditionType["TlsReady"] = "TlsReady";
+    DomainConditionType["Reachable"] = "Reachable";
+})(DomainConditionType || (DomainConditionType = {}));
+export var ConditionStatus;
+(function (ConditionStatus) {
+    ConditionStatus["True"] = "True";
+    ConditionStatus["False"] = "False";
+    ConditionStatus["Unknown"] = "Unknown";
+})(ConditionStatus || (ConditionStatus = {}));
 /** Severity level of problem. */
 export var SeverityLevel;
 (function (SeverityLevel) {
@@ -819,6 +872,22 @@ export var ContainerTerminalMode;
     ContainerTerminalMode["Exec"] = "exec";
     ContainerTerminalMode["Attach"] = "attach";
 })(ContainerTerminalMode || (ContainerTerminalMode = {}));
+export var ProxyMode;
+(function (ProxyMode) {
+    ProxyMode["DnsOnly"] = "DnsOnly";
+    ProxyMode["Proxied"] = "Proxied";
+})(ProxyMode || (ProxyMode = {}));
+export var DomainPlanOperation;
+(function (DomainPlanOperation) {
+    DomainPlanOperation["Create"] = "Create";
+    DomainPlanOperation["Update"] = "Update";
+    DomainPlanOperation["Reconcile"] = "Reconcile";
+    DomainPlanOperation["Remove"] = "Remove";
+    DomainPlanOperation["Migrate"] = "Migrate";
+    DomainPlanOperation["Adopt"] = "Adopt";
+    DomainPlanOperation["Abandon"] = "Abandon";
+    DomainPlanOperation["FinalizeMigration"] = "FinalizeMigration";
+})(DomainPlanOperation || (DomainPlanOperation = {}));
 export var ActionSortBy;
 (function (ActionSortBy) {
     /** Sort by name. Default. */
@@ -1112,6 +1181,8 @@ export var RepoWebhookAction;
 /** The specific types of permission that a User or UserGroup can have on a resource. */
 export var SpecificPermission;
 (function (SpecificPermission) {
+    /** Explicit authorization to publish a Deployment or Stack using a Domain. */
+    SpecificPermission["AttachDomain"] = "AttachDomain";
     /**
      * On **Server**
      * - Access the terminal apis
@@ -1158,3 +1229,8 @@ export var SyncWebhookAction;
     SyncWebhookAction["Refresh"] = "Refresh";
     SyncWebhookAction["Sync"] = "Sync";
 })(SyncWebhookAction || (SyncWebhookAction = {}));
+export var TargetScheme;
+(function (TargetScheme) {
+    TargetScheme["Http"] = "Http";
+    TargetScheme["Https"] = "Https";
+})(TargetScheme || (TargetScheme = {}));

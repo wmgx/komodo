@@ -29,6 +29,33 @@ use super::{
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "schemars", schemars(rename = "Resources"))]
 pub struct ResourcesToml {
+  #[serde(
+    default,
+    alias = "domain",
+    skip_serializing_if = "Vec::is_empty"
+  )]
+  #[cfg_attr(feature = "schemars", schemars(rename = "domain"))]
+  pub domains: Vec<ResourceToml<super::domain::_PartialDomainConfig>>,
+  #[serde(
+    default,
+    alias = "dns_provider",
+    skip_serializing_if = "Vec::is_empty"
+  )]
+  #[cfg_attr(
+    feature = "schemars",
+    schemars(rename = "dns_provider")
+  )]
+  pub dns_providers:
+    Vec<ResourceToml<super::domain::_PartialDnsProviderConfig>>,
+  #[serde(
+    default,
+    alias = "ingress",
+    skip_serializing_if = "Vec::is_empty"
+  )]
+  #[cfg_attr(feature = "schemars", schemars(rename = "ingress"))]
+  pub ingresses:
+    Vec<ResourceToml<super::domain::_PartialIngressConfig>>,
+
   /// Declare a swarm
   #[serde(
     default,

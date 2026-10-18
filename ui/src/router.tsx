@@ -13,6 +13,7 @@ import { MoghAuth } from "komodo_client";
 import App from "@/app";
 
 const Login = lazy(() => import("@/pages/login"));
+const Domains = lazy(() => import("@/resources/domain"));
 const UserDisabled = lazy(() => import("@/pages/user-disabled"));
 const Settings = lazy(() => import("@/pages/settings"));
 const Updates = lazy(() => import("@/pages/updates"));
@@ -67,6 +68,16 @@ export const Router = () => {
             <Route path="schedules" element={<Schedules />} />
             <Route path="profile" element={<Profile />} />
             <Route path="settings" element={<Settings />} />
+            <Route path="domains" element={<Domains />} />
+            <Route path="domains/:id" element={<Domains />} />
+            <Route
+              path="dns-providers"
+              element={<Domains connections="DnsProvider" />}
+            />
+            <Route
+              path="ingresses"
+              element={<Domains connections="Ingress" />}
+            />
             <Route path="user-groups/:id" element={<UserGroup />} />
             <Route path="users/:id" element={<User />} />
             <Route path="updates">

@@ -1,6 +1,20 @@
 import * as Types from "./types.js";
 
 export type ReadResponses = {
+  // BEGIN GENERATED DOMAIN READ
+  GetDomain: Types.Domain;
+  ListDomains: Types.Domain[];
+  GetDnsProvider: Types.DnsProvider;
+  ListDnsProviders: Types.DnsProvider[];
+  GetIngress: Types.Ingress;
+  ListIngresses: Types.Ingress[];
+  GetDomainStatus: Types.DomainStatus;
+  ListDomainAdapters: Types.DomainAdapterCapabilities[];
+  GetDomainAdapterCapabilities: Types.DomainAdapterCapabilities;
+  PlanDomainChange: Types.DomainPlan;
+  GetDomainPlan: Types.DomainPlan;
+  ValidateDomainConnection: Types.DomainConnectionValidation;
+  // END GENERATED DOMAIN READ
   GetVersion: Types.GetVersionResponse;
   GetCoreInfo: Types.GetCoreInfoResponse;
   ListSecrets: Types.ListSecretsResponse;
@@ -192,6 +206,17 @@ export type ReadResponses = {
 };
 
 export type WriteResponses = {
+  // BEGIN GENERATED DOMAIN WRITE
+  CreateDomain: Types.Domain;
+  UpdateDomain: Types.Domain;
+  DeleteDomain: Types.Domain;
+  CreateDnsProvider: Types.DnsProvider;
+  UpdateDnsProvider: Types.DnsProvider;
+  DeleteDnsProvider: Types.DnsProvider;
+  CreateIngress: Types.Ingress;
+  UpdateIngress: Types.Ingress;
+  DeleteIngress: Types.Ingress;
+  // END GENERATED DOMAIN WRITE
   // ==== RESOURCE ====
   UpdateResourceMeta: Types.UpdateResourceMetaResponse;
 
@@ -352,6 +377,12 @@ export type WriteResponses = {
 };
 
 export type ExecuteResponses = {
+  // BEGIN GENERATED DOMAIN EXECUTE
+  ReconcileDomain: Types.Update;
+  RemoveDomain: Types.Update;
+  MigrateDomain: Types.Update;
+  FinalizeDomainMigration: Types.Update;
+  // END GENERATED DOMAIN EXECUTE
   // ==== STACK ====
   DeployStack: Types.Update;
   BatchDeployStack: Types.BatchExecutionResponse;

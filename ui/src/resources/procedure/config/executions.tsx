@@ -12,6 +12,7 @@ import {
   Group,
   Modal,
   MultiSelect,
+  NumberInput,
   SimpleGrid,
   Stack,
   Switch,
@@ -67,7 +68,59 @@ export type ProcedureExecutions = {
   };
 };
 
+const domainExecution: {
+  params: Types.ReconcileDomain;
+  Component: ProcedureExecutionComponent<"ReconcileDomain">;
+} = {
+  params: { domain: "", plan_id: "", expected_generation: 0, request_id: "" },
+  Component: ({ params, setParams, disabled }) => (
+    <Stack>
+      <Text size="sm">
+        Domain executions use server-side plans, authorization and ownership
+        checks. Plans expire; generate a fresh plan before execution.
+      </Text>
+      <TextInput
+        label="Domain name or ID"
+        value={params.domain}
+        disabled={disabled}
+        onChange={(e) =>
+          setParams({ ...params, domain: e.currentTarget.value })
+        }
+      />
+      <TextInput
+        label="Server plan ID"
+        value={params.plan_id}
+        disabled={disabled}
+        onChange={(e) =>
+          setParams({ ...params, plan_id: e.currentTarget.value })
+        }
+      />
+      <NumberInput
+        label="Expected generation"
+        min={0}
+        value={params.expected_generation}
+        disabled={disabled}
+        onChange={(v) =>
+          setParams({ ...params, expected_generation: Number(v) })
+        }
+      />
+      <TextInput
+        label="Request ID (reuse only for retries of the same operation)"
+        value={params.request_id}
+        disabled={disabled}
+        onChange={(e) =>
+          setParams({ ...params, request_id: e.currentTarget.value })
+        }
+      />
+    </Stack>
+  ),
+};
+
 export const PROCEDURE_EXECUTIONS: ProcedureExecutions = {
+  ReconcileDomain: domainExecution,
+  RemoveDomain: domainExecution,
+  MigrateDomain: domainExecution,
+  FinalizeDomainMigration: domainExecution,
   None: {
     params: {},
     Component: () => <></>,
@@ -94,9 +147,7 @@ export const PROCEDURE_EXECUTIONS: ProcedureExecutions = {
             params.pattern ||
             "# Match procedures by name, id, wildcard, or \\regex\\.\n"
           }
-          onUpdate={(pattern) =>
-            setParams({ ...params, pattern })
-          }
+          onUpdate={(pattern) => setParams({ ...params, pattern })}
           disabled={disabled}
           useMonaco
           monacoLanguage="string_list"
@@ -145,9 +196,7 @@ export const PROCEDURE_EXECUTIONS: ProcedureExecutions = {
             params.pattern ||
             "# Match actions by name, id, wildcard, or \\regex\\.\n"
           }
-          onUpdate={(pattern) =>
-            setParams({ ...params, pattern })
-          }
+          onUpdate={(pattern) => setParams({ ...params, pattern })}
           disabled={disabled}
           useMonaco
           monacoLanguage="string_list"
@@ -184,9 +233,7 @@ export const PROCEDURE_EXECUTIONS: ProcedureExecutions = {
             params.pattern ||
             "# Match builds by name, id, wildcard, or \\regex\\.\n"
           }
-          onUpdate={(pattern) =>
-            setParams({ ...params, pattern })
-          }
+          onUpdate={(pattern) => setParams({ ...params, pattern })}
           disabled={disabled}
           useMonaco
           monacoLanguage="string_list"
@@ -236,9 +283,7 @@ export const PROCEDURE_EXECUTIONS: ProcedureExecutions = {
             params.pattern ||
             "# Match deployments by name, id, wildcard, or \\regex\\.\n"
           }
-          onUpdate={(pattern) =>
-            setParams({ ...params, pattern })
-          }
+          onUpdate={(pattern) => setParams({ ...params, pattern })}
           disabled={disabled}
           useMonaco
           monacoLanguage="string_list"
@@ -340,9 +385,7 @@ export const PROCEDURE_EXECUTIONS: ProcedureExecutions = {
             params.pattern ||
             "# Match deployments by name, id, wildcard, or \\regex\\.\n"
           }
-          onUpdate={(pattern) =>
-            setParams({ ...params, pattern })
-          }
+          onUpdate={(pattern) => setParams({ ...params, pattern })}
           disabled={disabled}
           useMonaco
           monacoLanguage="string_list"
@@ -400,9 +443,7 @@ export const PROCEDURE_EXECUTIONS: ProcedureExecutions = {
             params.pattern ||
             "# Match stacks by name, id, wildcard, or \\regex\\.\n"
           }
-          onUpdate={(pattern) =>
-            setParams({ ...params, pattern })
-          }
+          onUpdate={(pattern) => setParams({ ...params, pattern })}
           disabled={disabled}
           useMonaco
           monacoLanguage="string_list"
@@ -438,9 +479,7 @@ export const PROCEDURE_EXECUTIONS: ProcedureExecutions = {
             params.pattern ||
             "# Match stacks by name, id, wildcard, or \\regex\\.\n"
           }
-          onUpdate={(pattern) =>
-            setParams({ ...params, pattern })
-          }
+          onUpdate={(pattern) => setParams({ ...params, pattern })}
           disabled={disabled}
           useMonaco
           monacoLanguage="string_list"
@@ -497,9 +536,7 @@ export const PROCEDURE_EXECUTIONS: ProcedureExecutions = {
             params.pattern ||
             "# Match stacks by name, id, wildcard, or \\regex\\.\n"
           }
-          onUpdate={(pattern) =>
-            setParams({ ...params, pattern })
-          }
+          onUpdate={(pattern) => setParams({ ...params, pattern })}
           disabled={disabled}
           useMonaco
           monacoLanguage="string_list"
@@ -716,9 +753,7 @@ export const PROCEDURE_EXECUTIONS: ProcedureExecutions = {
             params.pattern ||
             "# Match stacks by name, id, wildcard, or \\regex\\.\n"
           }
-          onUpdate={(pattern) =>
-            setParams({ ...params, pattern })
-          }
+          onUpdate={(pattern) => setParams({ ...params, pattern })}
           disabled={disabled}
           useMonaco
           monacoLanguage="string_list"
@@ -1018,9 +1053,7 @@ export const PROCEDURE_EXECUTIONS: ProcedureExecutions = {
             params.pattern ||
             "# Match repos by name, id, wildcard, or \\regex\\.\n"
           }
-          onUpdate={(pattern) =>
-            setParams({ ...params, pattern })
-          }
+          onUpdate={(pattern) => setParams({ ...params, pattern })}
           disabled={disabled}
           useMonaco
           monacoLanguage="string_list"
@@ -1056,9 +1089,7 @@ export const PROCEDURE_EXECUTIONS: ProcedureExecutions = {
             params.pattern ||
             "# Match repos by name, id, wildcard, or \\regex\\.\n"
           }
-          onUpdate={(pattern) =>
-            setParams({ ...params, pattern })
-          }
+          onUpdate={(pattern) => setParams({ ...params, pattern })}
           disabled={disabled}
           useMonaco
           monacoLanguage="string_list"
@@ -1094,9 +1125,7 @@ export const PROCEDURE_EXECUTIONS: ProcedureExecutions = {
             params.pattern ||
             "# Match repos by name, id, wildcard, or \\regex\\.\n"
           }
-          onUpdate={(pattern) =>
-            setParams({ ...params, pattern })
-          }
+          onUpdate={(pattern) => setParams({ ...params, pattern })}
           disabled={disabled}
           useMonaco
           monacoLanguage="string_list"

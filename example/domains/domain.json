@@ -1,0 +1,11 @@
+{
+  "name": "my-app",
+  "config": {
+    "hostname": "app.example.com",
+    "target": { "type": "Url", "params": { "url": "http://app:8080" } },
+    "dns": { "type": "Managed", "params": { "provider": "cloudflare-home", "ttl": 1, "proxy_mode": "DnsOnly" } },
+    "ingress": "traefik-home",
+    "tls": { "mode": "RequireHttps", "profile": "https" },
+    "reconcile_mode": "Manual"
+  }
+}

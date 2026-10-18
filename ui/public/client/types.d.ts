@@ -237,6 +237,15 @@ export type AlerterEndpoint =
 };
 /** Used to reference a specific resource across all resource types */
 export type ResourceTarget = {
+    type: "Domain";
+    id: string;
+} | {
+    type: "DnsProvider";
+    id: string;
+} | {
+    type: "Ingress";
+    id: string;
+} | {
     type: "System";
     id: string;
 } | {
@@ -392,6 +401,22 @@ export type BatchExecutionResponseItem = {
 };
 export type BatchExecutionResponse = BatchExecutionResponseItem[];
 export declare enum Operation {
+    RenameDomain = "RenameDomain",
+    RenameDnsProvider = "RenameDnsProvider",
+    RenameIngress = "RenameIngress",
+    CreateDomain = "CreateDomain",
+    UpdateDomain = "UpdateDomain",
+    DeleteDomain = "DeleteDomain",
+    ReconcileDomain = "ReconcileDomain",
+    RemoveDomain = "RemoveDomain",
+    MigrateDomain = "MigrateDomain",
+    FinalizeDomainMigration = "FinalizeDomainMigration",
+    CreateDnsProvider = "CreateDnsProvider",
+    UpdateDnsProvider = "UpdateDnsProvider",
+    DeleteDnsProvider = "DeleteDnsProvider",
+    CreateIngress = "CreateIngress",
+    UpdateIngress = "UpdateIngress",
+    DeleteIngress = "DeleteIngress",
     None = "None",
     CreateSwarm = "CreateSwarm",
     UpdateSwarm = "UpdateSwarm",
@@ -875,9 +900,21 @@ export interface BuilderQuerySpecifics {
 }
 export type BuilderQuery = ResourceQuery<BuilderQuerySpecifics>;
 /** A wrapper for all Komodo exections. */
-export type Execution = 
+export type Execution = {
+    type: "ReconcileDomain";
+    params: ReconcileDomain;
+} | {
+    type: "RemoveDomain";
+    params: RemoveDomain;
+} | {
+    type: "MigrateDomain";
+    params: MigrateDomain;
+} | {
+    type: "FinalizeDomainMigration";
+    params: FinalizeDomainMigration;
+}
 /** The "null" execution. Does nothing. */
-{
+ | {
     type: "None";
     params: NoData;
 }
@@ -1690,6 +1727,119 @@ export interface DeploymentQuerySpecifics {
     states?: DeploymentState[];
 }
 export type DeploymentQuery = ResourceQuery<DeploymentQuerySpecifics>;
+export declare enum SecretSource {
+    CoreSecret = "CoreSecret"
+}
+export interface SecretRef {
+    source: SecretSource;
+    name: string;
+}
+export interface DnsProviderConfig {
+    adapter: string;
+    schema_version: number;
+    account_id: string;
+    zone_id: string;
+    secret: SecretRef;
+    allowed_hostname_suffixes?: string[];
+}
+export interface ConnectionInfo {
+    generation: I64;
+}
+export type DnsProvider = Resource<DnsProviderConfig, ConnectionInfo>;
+export interface DomainQuerySpecifics {
+}
+export type DnsProviderQuery = ResourceQuery<DomainQuerySpecifics>;
+export type DomainTarget = {
+    type: "Deployment";
+    params: {
+        id: string;
+        port: number;
+        scheme: TargetScheme;
+    };
+} | {
+    type: "StackService";
+    params: {
+        stack_id: string;
+        service: string;
+        port: number;
+        scheme: TargetScheme;
+    };
+} | {
+    type: "Url";
+    params: {
+        url: string;
+    };
+};
+export type DomainDns = {
+    type: "External";
+    params?: undefined;
+} | {
+    type: "Managed";
+    params: {
+        provider: string;
+        ttl: number;
+        proxy_mode: ProxyMode;
+    };
+};
+export declare enum TlsMode {
+    RequireHttps = "RequireHttps",
+    HttpOnly = "HttpOnly"
+}
+export interface DomainTls {
+    mode: TlsMode;
+    profile?: string;
+}
+export declare enum ReconcileMode {
+    Manual = "Manual",
+    Automatic = "Automatic"
+}
+export interface DomainConfig {
+    hostname: string;
+    target: DomainTarget;
+    dns?: DomainDns;
+    ingress: string;
+    tls?: DomainTls;
+    reconcile_mode?: ReconcileMode;
+}
+export declare enum DomainState {
+    Pending = "Pending",
+    Applying = "Applying",
+    Ready = "Ready",
+    Degraded = "Degraded",
+    Blocked = "Blocked",
+    Deleting = "Deleting"
+}
+export declare enum DomainConditionType {
+    TargetResolved = "TargetResolved",
+    IngressReady = "IngressReady",
+    DnsConfigured = "DnsConfigured",
+    TlsReady = "TlsReady",
+    Reachable = "Reachable"
+}
+export declare enum ConditionStatus {
+    True = "True",
+    False = "False",
+    Unknown = "Unknown"
+}
+export interface DomainCondition {
+    condition: DomainConditionType;
+    status: ConditionStatus;
+    reason: string;
+    message: string;
+    observed_at: I64;
+}
+export interface DomainInfo {
+    /** Original user-facing hostname. Normalized ASCII config.hostname remains the identity key. */
+    display_hostname?: string;
+    generation: I64;
+    observed_generation: I64;
+    config_digest: string;
+    last_operation_id?: string;
+    state: DomainState;
+    conditions?: DomainCondition[];
+}
+export type Domain = Resource<DomainConfig, DomainInfo>;
+export type DomainQuery = ResourceQuery<DomainQuerySpecifics>;
 /** Response containing pretty formatted toml contents. */
 export interface TomlResponse {
     toml: string;
@@ -3175,6 +3325,40 @@ export interface UserGroup {
 }
 export type GetUserGroupResponse = UserGroup;
 export type GetVariableResponse = Variable;
+export type IngressAdapterConfig = {
+    type: "TraefikFileV1";
+    params: {
+        server: string;
+        entrypoint: string;
+        dns_target: string;
+        dedicated: boolean;
+    };
+} | {
+    type: "CloudflareTunnelV1";
+    params: {
+        account_id: string;
+        tunnel_id: string;
+        secret: SecretRef;
+        dedicated: boolean;
+    };
+};
+export interface TlsProfile {
+    name: string;
+    mode: TlsMode;
+    certificate_resolver?: string;
+    requires_dns?: boolean;
+}
+export interface IngressConfig {
+    schema_version: number;
+    adapter: IngressAdapterConfig;
+    allowed_hostname_suffixes?: string[];
+    allowed_networks?: string[];
+    docker_network?: string;
+    tls_profiles?: TlsProfile[];
+    drain_seconds?: number;
+}
+export type Ingress = Resource<IngressConfig, ConnectionInfo>;
+export type IngressQuery = ResourceQuery<DomainQuerySpecifics>;
 export declare enum ContainerStateStatusEnum {
     Running = "running",
     Created = "created",
@@ -5865,8 +6049,11 @@ export type _PartialAwsBuilderConfig = Partial<AwsBuilderConfig>;
 export type _PartialBuildConfig = Partial<BuildConfig>;
 export type _PartialBuilderConfig = Partial<BuilderConfig>;
 export type _PartialDeploymentConfig = Partial<DeploymentConfig>;
+export type _PartialDnsProviderConfig = Partial<DnsProviderConfig>;
+export type _PartialDomainConfig = Partial<DomainConfig>;
 export type _PartialGitProviderAccount = Partial<GitProviderAccount>;
 export type _PartialImageRegistryAccount = Partial<ImageRegistryAccount>;
+export type _PartialIngressConfig = Partial<IngressConfig>;
 export type _PartialProcedureConfig = Partial<ProcedureConfig>;
 export type _PartialRepoConfig = Partial<RepoConfig>;
 export type _PartialResourceSyncConfig = Partial<ResourceSyncConfig>;
@@ -6873,6 +7060,14 @@ export interface CreateDeploymentFromContainer {
     /** The server id or name on which container exists. */
     server: string;
 }
+export interface CreateDnsProvider {
+    name: string;
+    config: DnsProviderConfig;
+}
+export interface CreateDomain {
+    name: string;
+    config: DomainConfig;
+}
 /**
  * **Admin only.** Create a git provider account.
  * Response: [GitProviderAccount].
@@ -6892,6 +7087,10 @@ export interface CreateGitProviderAccount {
  */
 export interface CreateImageRegistryAccount {
     account: _PartialImageRegistryAccount;
+}
+export interface CreateIngress {
+    name: string;
+    config: IngressConfig;
 }
 /**
  * **Admin only.** Create a local user.
@@ -7172,6 +7371,12 @@ export interface DeleteDeployment {
     /** The id or name of the deployment to delete. */
     id: string;
 }
+export interface DeleteDnsProvider {
+    id: string;
+}
+export interface DeleteDomain {
+    id: string;
+}
 /**
  * **Admin only.** Delete a git provider account.
  * Response: [DeleteGitProviderAccountResponse].
@@ -7198,6 +7403,9 @@ export interface DeleteImage {
  */
 export interface DeleteImageRegistryAccount {
     /** The id of the image registry account to delete */
+    id: string;
+}
+export interface DeleteIngress {
     id: string;
 }
 /**
@@ -7427,6 +7635,63 @@ export interface DockerLists {
     volumes: VolumeListItem[];
     projects: ComposeProject[];
 }
+export declare enum ProxyMode {
+    DnsOnly = "DnsOnly",
+    Proxied = "Proxied"
+}
+export interface DomainAdapterCapabilities {
+    adapter: string;
+    schema_version: number;
+    target_types: string[];
+    tls_modes: TlsMode[];
+    dns_types: string[];
+    proxy_modes: ProxyMode[];
+    migration_modes: string[];
+    tls_bootstrap_requires_dns: boolean;
+}
+export interface DomainError {
+    code: string;
+    message: string;
+    retryable: boolean;
+    field?: string;
+    update_id?: string;
+}
+export interface DomainConnectionValidation {
+    valid: boolean;
+    capabilities: DomainAdapterCapabilities;
+    errors: DomainError[];
+}
+export declare enum DomainPlanOperation {
+    Create = "Create",
+    Update = "Update",
+    Reconcile = "Reconcile",
+    Remove = "Remove",
+    Migrate = "Migrate",
+    Adopt = "Adopt",
+    Abandon = "Abandon",
+    FinalizeMigration = "FinalizeMigration"
+}
+export interface DomainPlan {
+    plan_id: string;
+    domain_id?: string;
+    name: string;
+    generation: I64;
+    expires_at: I64;
+    operation: DomainPlanOperation;
+    steps: string[];
+    warnings: string[];
+    requires_downtime: boolean;
+    request_id: string;
+}
+export interface DomainStatus {
+    domain_id: string;
+    generation: I64;
+    observed_generation: I64;
+    state: DomainState;
+    conditions: DomainCondition[];
+    update_id?: string;
+    error?: DomainError;
+}
 export interface EnvironmentVar {
     variable: string;
     value: string;
@@ -7509,6 +7774,9 @@ export interface UserGroupToml {
 }
 /** Specifies resources to sync on Komodo */
 export interface ResourcesToml {
+    domains?: ResourceToml<_PartialDomainConfig>[];
+    dns_providers?: ResourceToml<_PartialDnsProviderConfig>[];
+    ingresses?: ResourceToml<_PartialIngressConfig>[];
     /** Declare a swarm */
     swarms?: ResourceToml<_PartialSwarmConfig>[];
     /** Declare a server */
@@ -7584,6 +7852,12 @@ export interface ExportResourcesToToml {
      * the meta configuration.
      */
     existing?: ResourcesToml;
+}
+export interface FinalizeDomainMigration {
+    domain: string;
+    plan_id: string;
+    expected_generation: I64;
+    request_id: string;
 }
 /**
  * **Admin only.**
@@ -7799,6 +8073,8 @@ export interface GetCoreInfo {
 }
 /** Response for [GetCoreInfo]. */
 export interface GetCoreInfoResponse {
+    /** Domain management is explicitly enabled by this Core administrator. */
+    domain_management_enabled?: boolean;
     /** The title assigned to this core api. */
     title: string;
     /** The monitoring interval of this core api. */
@@ -7903,6 +8179,21 @@ export interface GetDeploymentsSummaryResponse {
     /** The number of Deployments with Unknown state */
     unknown: I64;
 }
+export interface GetDnsProvider {
+    dns_provider: string;
+}
+export interface GetDomain {
+    domain: string;
+}
+export interface GetDomainAdapterCapabilities {
+    adapter: string;
+}
+export interface GetDomainPlan {
+    plan_id: string;
+}
+export interface GetDomainStatus {
+    domain: string;
+}
 /**
  * Get a specific git provider account.
  * Response: [GetGitProviderAccountResponse].
@@ -7985,6 +8276,9 @@ export interface GetHistoricalServerStatsResponse {
  */
 export interface GetImageRegistryAccount {
     id: string;
+}
+export interface GetIngress {
+    ingress: string;
 }
 /**
  * Get the Periphery information of the target server,
@@ -8919,6 +9213,18 @@ export interface ListDeployments {
     /** Reverse the sort direction. */
     sort_desc?: boolean;
 }
+export interface ListDnsProviders {
+    query?: DnsProviderQuery;
+    page?: U64;
+    limit?: U64;
+}
+export interface ListDomainAdapters {
+}
+export interface ListDomains {
+    query?: DomainQuery;
+    page?: U64;
+    limit?: U64;
+}
 /** List actions matching optional query. Response: [ListFullActionsResponse]. */
 export interface ListFullActions {
     /** optional structured query to filter actions. */
@@ -9228,6 +9534,11 @@ export interface ListImageRegistryAccounts {
 export interface ListImages {
     /** Id or name */
     server: string;
+}
+export interface ListIngresses {
+    query?: IngressQuery;
+    page?: U64;
+    limit?: U64;
 }
 /**
  * List the container networks on the server. Response: [ListNetworksResponse].
@@ -9792,6 +10103,12 @@ export interface ListVolumes {
     /** Id or name */
     server: string;
 }
+export interface MigrateDomain {
+    domain: string;
+    plan_id: string;
+    expected_generation: I64;
+    request_id: string;
+}
 export interface NameAndId {
     name: string;
     id: string;
@@ -9840,6 +10157,56 @@ export interface PauseStack {
      * If empty, will pause all services.
      */
     services?: string[];
+}
+export type DomainChangeIntent = {
+    type: "Create";
+    params: {
+        name: string;
+        config: DomainConfig;
+    };
+} | {
+    type: "Update";
+    params: {
+        domain: string;
+        config: DomainConfig;
+        expected_generation: I64;
+    };
+} | {
+    type: "Reconcile";
+    params: {
+        domain: string;
+    };
+} | {
+    type: "Remove";
+    params: {
+        domain: string;
+    };
+} | {
+    type: "Migrate";
+    params: {
+        domain: string;
+        dns_provider?: string;
+        ingress?: string;
+    };
+} | {
+    type: "Adopt";
+    params: {
+        domain: string;
+        objects: string[];
+    };
+} | {
+    type: "Abandon";
+    params: {
+        domain: string;
+    };
+} | {
+    type: "FinalizeMigration";
+    params: {
+        domain: string;
+    };
+};
+export interface PlanDomainChange {
+    intent: DomainChangeIntent;
 }
 /**
  * Prunes the docker buildx cache on the target server. Response: [Update].
@@ -9944,6 +10311,12 @@ export interface PushoverAlerterEndpoint {
     /** The pushover URL including application and user tokens in parameters. */
     url: string;
 }
+export interface ReconcileDomain {
+    domain: string;
+    plan_id: string;
+    expected_generation: I64;
+    request_id: string;
+}
 /** Trigger a refresh of the cached latest hash and message. */
 export interface RefreshBuildCache {
     /** Id or name */
@@ -9968,6 +10341,12 @@ export interface RefreshResourceSyncPending {
 export interface RefreshStackCache {
     /** Id or name */
     stack: string;
+}
+export interface RemoveDomain {
+    domain: string;
+    plan_id: string;
+    expected_generation: I64;
+    request_id: string;
 }
 /**
  * `docker config rm CONFIG [CONFIG...]`
@@ -10842,6 +11221,16 @@ export interface UpdateDeployment {
     /** The partial config update. */
     config: _PartialDeploymentConfig;
 }
+export interface UpdateDnsProvider {
+    id: string;
+    config: DnsProviderConfig;
+    expected_generation: I64;
+}
+export interface UpdateDomain {
+    id: string;
+    config: DomainConfig;
+    expected_generation: I64;
+}
 /**
  * **Admin only.** Update a git provider account.
  * Response: [GitProviderAccount].
@@ -10863,6 +11252,11 @@ export interface UpdateImageRegistryAccount {
     id: string;
     /** The partial image registry account. */
     account: _PartialImageRegistryAccount;
+}
+export interface UpdateIngress {
+    id: string;
+    config: IngressConfig;
+    expected_generation: I64;
 }
 /**
  * **Admin only.** Update an onboarding key.
@@ -11157,6 +11551,16 @@ export interface UrlBuilderConfig {
      */
     passkey?: string;
 }
+export type DomainConnection = {
+    type: "DnsProvider";
+    params: string;
+} | {
+    type: "Ingress";
+    params: string;
+};
+export interface ValidateDomainConnection {
+    connection: DomainConnection;
+}
 /** Update dockerfile contents in Files on Server or Git Repo mode. Response: [Update]. */
 export interface WriteBuildFileContents {
     /** The name or id of the target Build. */
@@ -11201,6 +11605,18 @@ export declare enum DayOfWeek {
     Sunday = "Sunday"
 }
 export type ExecuteRequest = {
+    type: "ReconcileDomain";
+    params: ReconcileDomain;
+} | {
+    type: "RemoveDomain";
+    params: RemoveDomain;
+} | {
+    type: "MigrateDomain";
+    params: MigrateDomain;
+} | {
+    type: "FinalizeDomainMigration";
+    params: FinalizeDomainMigration;
+} | {
     type: "DeployStack";
     params: DeployStack;
 } | {
@@ -11524,6 +11940,42 @@ export declare enum IanaTimezone {
     PacificKiritimati = "Pacific/Kiritimati"
 }
 export type ReadRequest = {
+    type: "GetDomain";
+    params: GetDomain;
+} | {
+    type: "ListDomains";
+    params: ListDomains;
+} | {
+    type: "GetDnsProvider";
+    params: GetDnsProvider;
+} | {
+    type: "ListDnsProviders";
+    params: ListDnsProviders;
+} | {
+    type: "GetIngress";
+    params: GetIngress;
+} | {
+    type: "ListIngresses";
+    params: ListIngresses;
+} | {
+    type: "GetDomainStatus";
+    params: GetDomainStatus;
+} | {
+    type: "ListDomainAdapters";
+    params: ListDomainAdapters;
+} | {
+    type: "GetDomainAdapterCapabilities";
+    params: GetDomainAdapterCapabilities;
+} | {
+    type: "PlanDomainChange";
+    params: PlanDomainChange;
+} | {
+    type: "GetDomainPlan";
+    params: GetDomainPlan;
+} | {
+    type: "ValidateDomainConnection";
+    params: ValidateDomainConnection;
+} | {
     type: "GetVersion";
     params: GetVersion;
 } | {
@@ -11951,6 +12403,8 @@ export declare enum RepoWebhookAction {
 }
 /** The specific types of permission that a User or UserGroup can have on a resource. */
 export declare enum SpecificPermission {
+    /** Explicit authorization to publish a Deployment or Stack using a Domain. */
+    AttachDomain = "AttachDomain",
     /**
      * On **Server**
      * - Access the terminal apis
@@ -11995,7 +12449,38 @@ export declare enum SyncWebhookAction {
     Refresh = "Refresh",
     Sync = "Sync"
 }
+export declare enum TargetScheme {
+    Http = "Http",
+    Https = "Https"
+}
 export type WriteRequest = {
+    type: "CreateDomain";
+    params: CreateDomain;
+} | {
+    type: "UpdateDomain";
+    params: UpdateDomain;
+} | {
+    type: "DeleteDomain";
+    params: DeleteDomain;
+} | {
+    type: "CreateDnsProvider";
+    params: CreateDnsProvider;
+} | {
+    type: "UpdateDnsProvider";
+    params: UpdateDnsProvider;
+} | {
+    type: "DeleteDnsProvider";
+    params: DeleteDnsProvider;
+} | {
+    type: "CreateIngress";
+    params: CreateIngress;
+} | {
+    type: "UpdateIngress";
+    params: UpdateIngress;
+} | {
+    type: "DeleteIngress";
+    params: DeleteIngress;
+} | {
     type: "UpdateResourceMeta";
     params: UpdateResourceMeta;
 } | {

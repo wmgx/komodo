@@ -59,6 +59,7 @@ mod alerter;
 mod build;
 mod builder;
 mod deployment;
+mod domain;
 mod procedure;
 mod refresh;
 mod repo;
@@ -824,6 +825,11 @@ pub async fn update<T: KomodoResource>(
 
 fn resource_target<T: KomodoResource>(id: String) -> ResourceTarget {
   match T::resource_type() {
+    ResourceTargetVariant::Domain => ResourceTarget::Domain(id),
+    ResourceTargetVariant::DnsProvider => {
+      ResourceTarget::DnsProvider(id)
+    }
+    ResourceTargetVariant::Ingress => ResourceTarget::Ingress(id),
     ResourceTargetVariant::System => ResourceTarget::System(id),
     ResourceTargetVariant::Swarm => ResourceTarget::Swarm(id),
     ResourceTargetVariant::Server => ResourceTarget::Server(id),
@@ -1135,6 +1141,9 @@ where
     ResourceTarget::ResourceSync(id) => ("recents.ResourceSync", id),
     ResourceTarget::Builder(id) => ("recents.Builder", id),
     ResourceTarget::Alerter(id) => ("recents.Alerter", id),
+    ResourceTarget::Domain(id) => ("recents.Domain", id),
+    ResourceTarget::DnsProvider(id) => ("recents.DnsProvider", id),
+    ResourceTarget::Ingress(id) => ("recents.Ingress", id),
     ResourceTarget::System(_) => return,
   };
   if let Err(e) = db_client()

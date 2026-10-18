@@ -17,7 +17,68 @@ use mogh_secret_file::maybe_read_item_from_file;
 
 pub fn cli_args() -> &'static CliArgs {
   static CLI_ARGS: OnceLock<CliArgs> = OnceLock::new();
-  CLI_ARGS.get_or_init(CliArgs::parse)
+  CLI_ARGS.get_or_init(|| match CliArgs::try_parse() {
+    Ok(args) => args,
+    Err(error) => {
+      let raw: Vec<String> = std::env::args().collect();
+      let domain = domain_command_line(&raw);
+      let json = raw.iter().any(|arg| arg == "--format=json") || raw.windows(2).any(|pair| pair[0] == "--format" && pair[1] == "json");
+      if domain && json && !matches!(error.kind(), clap::error::ErrorKind::DisplayHelp | clap::error::ErrorKind::DisplayVersion) {
+        println!("{}", serde_json::json!({"api_version":"domain.v1","ok":false,"data":null,"error":{"code":"InvalidInput","message":"Invalid command arguments; use --help for syntax","retryable":false,"field":null,"update_id":null}}));
+        std::process::exit(2)
+      }
+      error.exit()
+    }
+  })
+}
+
+// Detect the command position without treating resource names as commands.
+fn domain_command_line(raw: &[String]) -> bool {
+  let mut index = 1;
+  while let Some(arg) = raw.get(index) {
+    if matches!(
+      arg.as_str(),
+      "--profile"
+        | "-p"
+        | "--config-path"
+        | "-c"
+        | "--config-keyword"
+        | "-m"
+        | "--debug-startup"
+        | "-d"
+    ) {
+      index += 2;
+      continue;
+    }
+    if arg.starts_with('-') {
+      index += 1;
+      continue;
+    }
+    return match arg.as_str() {
+      "domain" => true,
+      "list" | "ls" | "resources" => {
+        raw.get(index + 1).is_some_and(|s| {
+          matches!(
+            s.as_str(),
+            "domains" | "dns-providers" | "ingresses"
+          )
+        })
+      }
+      "execute" | "x" | "run" | "deploy" | "dep" | "send" => {
+        raw.get(index + 1).is_some_and(|s| {
+          matches!(
+            s.as_str(),
+            "reconcile-domain"
+              | "remove-domain"
+              | "migrate-domain"
+              | "finalize-domain-migration"
+          )
+        })
+      }
+      _ => false,
+    };
+  }
+  false
 }
 
 pub fn cli_env() -> &'static Env {
@@ -43,8 +104,8 @@ pub fn cli_config() -> &'static CliConfig {
       .config_path
       .clone()
       .unwrap_or(env.komodo_cli_config_paths);
-    let debug_startup =
-      args.debug_startup.unwrap_or(env.komodo_cli_debug_startup);
+    let debug_startup = !args.command.is_domain_management()
+      && args.debug_startup.unwrap_or(env.komodo_cli_debug_startup);
 
     if debug_startup {
       println!(

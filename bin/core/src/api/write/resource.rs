@@ -1,4 +1,5 @@
 use anyhow::anyhow;
+use komodo_client::entities::domain::{DnsProvider, Domain, Ingress};
 use komodo_client::{
   api::write::{UpdateResourceMeta, UpdateResourceMetaResponse},
   entities::{
@@ -39,6 +40,15 @@ impl Resolve<WriteArgs> for UpdateResourceMeta {
       tags: self.tags,
     };
     match self.target {
+      ResourceTarget::Domain(id) => {
+        resource::update_meta::<Domain>(&id, meta, args).await?;
+      }
+      ResourceTarget::DnsProvider(id) => {
+        resource::update_meta::<DnsProvider>(&id, meta, args).await?;
+      }
+      ResourceTarget::Ingress(id) => {
+        resource::update_meta::<Ingress>(&id, meta, args).await?;
+      }
       ResourceTarget::System(_) => {
         return Err(
           anyhow!("cannot update meta of System resource target")

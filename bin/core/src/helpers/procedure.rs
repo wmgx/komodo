@@ -231,6 +231,22 @@ async fn execute_execution(
   }
 
   let update = match execution {
+    Execution::ReconcileDomain(req) => {
+      let update = resolve_execute!(ReconcileDomain, req);
+      super::update::poll_update_until_complete(&update.id).await?
+    }
+    Execution::RemoveDomain(req) => {
+      let update = resolve_execute!(RemoveDomain, req);
+      super::update::poll_update_until_complete(&update.id).await?
+    }
+    Execution::MigrateDomain(req) => {
+      let update = resolve_execute!(MigrateDomain, req);
+      super::update::poll_update_until_complete(&update.id).await?
+    }
+    Execution::FinalizeDomainMigration(req) => {
+      let update = resolve_execute!(FinalizeDomainMigration, req);
+      super::update::poll_update_until_complete(&update.id).await?
+    }
     Execution::None(_) => return Ok(()),
     // Special: self-referential guard
     Execution::RunProcedure(req) => {
@@ -702,6 +718,11 @@ pub fn replace_procedure_stage_ids_with_names(
         }
 
       replace_id_with_name!(
+        ReconcileDomain => domain, domains;
+        RemoveDomain => domain, domains;
+        MigrateDomain => domain, domains;
+        FinalizeDomainMigration => domain, domains;
+
         RunProcedure => procedure, procedures;
         CancelProcedure => procedure, procedures;
         RunAction => action, actions;

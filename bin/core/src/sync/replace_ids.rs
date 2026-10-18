@@ -4,6 +4,10 @@ use komodo_client::entities::{
   build::Build,
   builder::{Builder, BuilderConfig},
   deployment::{Deployment, DeploymentImage},
+  domain::{
+    DnsProvider, Domain, DomainDns, DomainTarget, Ingress,
+    IngressAdapterConfig,
+  },
   procedure::Procedure,
   repo::Repo,
   server::Server,
@@ -231,6 +235,9 @@ impl ReplaceIds for Alerter {
         Builder => builders,
         Alerter => alerters,
         ResourceSync => syncs,
+        Domain => domains,
+        DnsProvider => dns_providers,
+        Ingress => ingresses,
       });
     }
     for resource in &mut config.except_resources {
@@ -246,7 +253,51 @@ impl ReplaceIds for Alerter {
         Builder => builders,
         Alerter => alerters,
         ResourceSync => syncs,
+        Domain => domains,
+        DnsProvider => dns_providers,
+        Ingress => ingresses,
       });
+    }
+  }
+}
+
+impl ReplaceIds for DnsProvider {}
+impl ReplaceIds for Ingress {
+  fn replace_ids(config: &mut Self::Config) {
+    if let IngressAdapterConfig::TraefikFileV1 { server, .. } =
+      &mut config.adapter
+    {
+      if let Some(resource) =
+        all_resources_cache().load().servers.get(server)
+      {
+        *server = resource.name.clone();
+      }
+    }
+  }
+}
+impl ReplaceIds for Domain {
+  fn replace_ids(config: &mut Self::Config) {
+    let all = all_resources_cache().load();
+    if let Some(resource) = all.ingresses.get(&config.ingress) {
+      config.ingress = resource.name.clone();
+    }
+    if let DomainDns::Managed { provider, .. } = &mut config.dns {
+      if let Some(resource) = all.dns_providers.get(provider) {
+        *provider = resource.name.clone();
+      }
+    }
+    match &mut config.target {
+      DomainTarget::Deployment { id, .. } => {
+        if let Some(resource) = all.deployments.get(id) {
+          *id = resource.name.clone();
+        }
+      }
+      DomainTarget::StackService { stack_id, .. } => {
+        if let Some(resource) = all.stacks.get(stack_id) {
+          *stack_id = resource.name.clone();
+        }
+      }
+      DomainTarget::Url { .. } => {}
     }
   }
 }

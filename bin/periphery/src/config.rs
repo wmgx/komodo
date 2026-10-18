@@ -178,6 +178,10 @@ pub fn periphery_config() -> &'static PeripheryConfig {
       ssl_cert_file: env
         .periphery_ssl_cert_file
         .or(config.ssl_cert_file),
+      domain_enabled: config.domain_enabled,
+      domain_ingress_directories: config.domain_ingress_directories,
+      domain_ingress_observation_urls: config
+        .domain_ingress_observation_urls,
       secrets: config.secrets,
       git_providers: config.git_providers,
       image_registries: config.image_registries,

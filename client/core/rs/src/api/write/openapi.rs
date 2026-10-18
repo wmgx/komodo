@@ -5,6 +5,16 @@ use crate::api::write;
 #[derive(OpenApi)]
 #[openapi(
   paths(
+    write::create_domain,
+    write::update_domain,
+    write::delete_domain,
+    write::create_dns_provider,
+    write::update_dns_provider,
+    write::delete_dns_provider,
+    write::create_ingress,
+    write::update_ingress,
+    write::delete_ingress,
+
     // onboarding key
     write::create_onboarding_key,
     write::update_onboarding_key,

@@ -20,6 +20,15 @@ pub async fn handle(
   execution: &Execution,
   yes: bool,
 ) -> anyhow::Result<()> {
+  if matches!(
+    execution,
+    Execution::ReconcileDomain(_)
+      | Execution::RemoveDomain(_)
+      | Execution::MigrateDomain(_)
+      | Execution::FinalizeDomainMigration(_)
+  ) {
+    return super::domain::native_execute(execution, yes).await;
+  }
   if matches!(execution, Execution::None(_)) {
     println!("Got 'none' execution. Doing nothing...");
     tokio::time::sleep(Duration::from_secs(3)).await;
@@ -40,6 +49,7 @@ pub async fn handle(
         $(Execution::$BatchVariant(data) => println!("{}: {data:?}", "Data".dimmed()),)*
         Execution::CommitSync(data) => println!("{}: {data:?}", "Data".dimmed()),
         Execution::Sleep(data) => println!("{}: {data:?}", "Data".dimmed()),
+        Execution::ReconcileDomain(_) | Execution::RemoveDomain(_) | Execution::MigrateDomain(_) | Execution::FinalizeDomainMigration(_) => unreachable!(),
         Execution::None(data) => println!("{}: {data:?}", "Data".dimmed()),
       }
 
@@ -73,7 +83,7 @@ pub async fn handle(
           println!("Finished sleeping!");
           std::process::exit(0)
         }
-        Execution::None(_) => unreachable!(),
+        Execution::None(_) | Execution::ReconcileDomain(_) | Execution::RemoveDomain(_) | Execution::MigrateDomain(_) | Execution::FinalizeDomainMigration(_) => unreachable!(),
       }
     }};
   }

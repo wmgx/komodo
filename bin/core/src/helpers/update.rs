@@ -156,6 +156,10 @@ pub async fn init_execution_update(
             ),
           ),
         )*
+        ExecuteRequest::ReconcileDomain(_) => return Ok(Default::default()),
+        ExecuteRequest::RemoveDomain(_) => return Ok(Default::default()),
+        ExecuteRequest::MigrateDomain(_) => return Ok(Default::default()),
+        ExecuteRequest::FinalizeDomainMigration(_) => return Ok(Default::default()),
         // DeployStackIfChanged doesn't have a service variant
         ExecuteRequest::DeployStackIfChanged(data) => (
           Operation::DeployStack,

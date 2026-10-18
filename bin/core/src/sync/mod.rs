@@ -13,6 +13,7 @@ use toml::ToToml;
 use crate::resource::KomodoResource;
 
 pub mod deploy;
+pub mod domain;
 pub mod execute;
 pub mod file;
 pub mod remote;

@@ -15,6 +15,7 @@ use komodo_client::{
     build::Build,
     builder::Builder,
     deployment::Deployment,
+    domain::{DnsProvider, Domain, Ingress},
     komodo_timestamp,
     permission::PermissionLevel,
     procedure::Procedure,
@@ -168,6 +169,9 @@ impl Resolve<ExecuteArgs> for RunSync {
             (ResourceSync, syncs),
             (Builder, builders),
             (Alerter, alerters),
+            (Domain, domains),
+            (DnsProvider, dns_providers),
+            (Ingress, ingresses),
           )
         })
         .collect::<Vec<_>>()
@@ -216,6 +220,40 @@ impl Resolve<ExecuteArgs> for RunSync {
 
     let delete = sync.config.managed || sync.config.delete;
 
+    // Keep full desired configurations. The domain API applies CAS updates and validates
+    // AttachDomain using the initiating user, not the synthetic sync administrator.
+    macro_rules! selected_domain_resources {
+      ($Type:ident, $field:ident) => {
+        resources
+          .$field
+          .iter()
+          .filter(|item| {
+            sync.config.include_resources
+              && $Type::include_resource_partial(
+                &item.name,
+                &item.config,
+                match_resource_type,
+                match_resources.as_deref(),
+                &item.tags,
+                &id_to_tags,
+                &sync.config.match_tags,
+              )
+          })
+          .cloned()
+          .collect()
+      };
+    }
+    let mut domain_resources =
+      crate::sync::domain::DomainSyncResources {
+        domains: selected_domain_resources!(Domain, domains),
+        dns_providers: selected_domain_resources!(
+          DnsProvider,
+          dns_providers
+        ),
+        ingresses: selected_domain_resources!(Ingress, ingresses),
+        remove: Vec::new(),
+      };
+
     macro_rules! get_deltas {
       ($(($var:ident, $Type:ident, $field:ident)),* $(,)?) => {
         $(
@@ -237,6 +275,7 @@ impl Resolve<ExecuteArgs> for RunSync {
     }
     // New resource types need to be added here manually.
     get_deltas!(
+      (domain_deltas, Domain, domains),
       (server_deltas, Server, servers),
       (swarm_deltas, Swarm, swarms),
       (stack_deltas, Stack, stacks),
@@ -249,6 +288,28 @@ impl Resolve<ExecuteArgs> for RunSync {
       (alerter_deltas, Alerter, alerters),
       (resource_sync_deltas, ResourceSync, resource_syncs),
     );
+
+    domain_resources.remove = domain_deltas.to_delete.clone();
+    // Absence of a connection declaration never deletes the connection or its external objects.
+    let dns_provider_deltas =
+      get_updates_for_execution::<DnsProvider>(
+        domain_resources.dns_providers.clone(),
+        false,
+        match_resource_type,
+        match_resources.as_deref(),
+        &id_to_tags,
+        &sync.config.match_tags,
+      )
+      .await?;
+    let ingress_deltas = get_updates_for_execution::<Ingress>(
+      domain_resources.ingresses.clone(),
+      false,
+      match_resource_type,
+      match_resources.as_deref(),
+      &id_to_tags,
+      &sync.config.match_tags,
+    )
+    .await?;
 
     let (
       variables_to_create,
@@ -284,7 +345,11 @@ impl Resolve<ExecuteArgs> for RunSync {
     };
 
     // New resource types need to be added here manually.
-    if deploy_cache.is_empty()
+    if domain_deltas.no_changes()
+      && dns_provider_deltas.no_changes()
+      && ingress_deltas.no_changes()
+      && !domain_resources.domains.iter().any(|item| item.deploy)
+      && deploy_cache.is_empty()
       && resource_sync_deltas.no_changes()
       && server_deltas.no_changes()
       && swarm_deltas.no_changes()
@@ -324,6 +389,20 @@ impl Resolve<ExecuteArgs> for RunSync {
     // latter resources may depend on prior synced resources
     // already being updated with the declared state.
     // =====================================================
+
+    // Cleanup missing domains before generic target deletions can run.
+    if !crate::sync::domain::remove(
+      &domain_resources,
+      user,
+      &mut update.logs,
+    )
+    .await
+    {
+      update.finalize();
+      drop(action_guard);
+      update_update(update.clone()).await?;
+      return Ok(update);
+    }
 
     // No deps
     maybe_extend(
@@ -400,8 +479,33 @@ impl Resolve<ExecuteArgs> for RunSync {
       Procedure::execute_sync_updates(procedure_deltas).await,
     );
 
+    // Save connections after servers/targets, before performing any external domain writes.
+    let domain_saved = if domain_resources.domains.is_empty()
+      && domain_resources.dns_providers.is_empty()
+      && domain_resources.ingresses.is_empty()
+    {
+      true
+    } else {
+      crate::sync::domain::save(
+        &domain_resources,
+        user,
+        &mut update.logs,
+      )
+      .await
+    };
+
     // Execute the deploy cache
     deploy_from_cache(deploy_cache, &mut update.logs).await;
+    if domain_saved
+      && komodo_client::entities::all_logs_success(&update.logs)
+    {
+      crate::sync::domain::deploy(
+        &domain_resources,
+        user,
+        &mut update.logs,
+      )
+      .await;
+    }
 
     let db = db_client();
 

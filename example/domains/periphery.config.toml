@@ -1,0 +1,10 @@
+# Merge deliberately into Periphery configuration after creating the Ingress.
+domain_enabled = true
+
+[domain_ingress_directories]
+REPLACE_INGRESS_RESOURCE_ID = "/etc/komodo/domains/traefik-home"
+
+# Optional. This URL is configured by the host administrator, never in an RPC.
+# For containerized Periphery, use a protected reachable address instead of host loopback.
+[domain_ingress_observation_urls]
+REPLACE_INGRESS_RESOURCE_ID = "http://127.0.0.1:8080"

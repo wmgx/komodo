@@ -2,10 +2,21 @@ use std::collections::HashMap;
 
 use formatting::{Color, bold, colored, muted};
 use komodo_client::entities::{
-  ResourceTargetVariant, action::Action, alerter::Alerter,
-  build::Build, builder::Builder, deployment::Deployment,
-  procedure::Procedure, repo::Repo, server::Server, stack::Stack,
-  swarm::Swarm, sync::ResourceSync, tag::Tag, update::Log,
+  ResourceTargetVariant,
+  action::Action,
+  alerter::Alerter,
+  build::Build,
+  builder::Builder,
+  deployment::Deployment,
+  domain::{DnsProvider, Domain, Ingress},
+  procedure::Procedure,
+  repo::Repo,
+  server::Server,
+  stack::Stack,
+  swarm::Swarm,
+  sync::ResourceSync,
+  tag::Tag,
+  update::Log,
   user::sync_user,
 };
 use partial_derive2::MaybeNone;
@@ -20,6 +31,10 @@ use super::{
   include_resource_by_resource_type_and_name,
   include_resource_by_tags,
 };
+
+impl ResourceSyncTrait for Domain {}
+impl ResourceSyncTrait for DnsProvider {}
+impl ResourceSyncTrait for Ingress {}
 
 impl ResourceSyncTrait for Server {}
 impl ExecuteResourceSync for Server {}

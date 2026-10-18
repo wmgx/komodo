@@ -39,6 +39,7 @@ pub mod config;
 pub mod deployment;
 /// Networks, Images, Containers.
 pub mod docker;
+pub mod domain;
 /// Subtypes of [LogConfig][logger::LogConfig].
 pub mod logger;
 /// Subtypes of [CreationKey][creation_key::CreationKey]
@@ -1199,6 +1200,22 @@ pub enum IanaTimezone {
 )]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 pub enum Operation {
+  RenameDomain,
+  RenameDnsProvider,
+  RenameIngress,
+  CreateDomain,
+  UpdateDomain,
+  DeleteDomain,
+  ReconcileDomain,
+  RemoveDomain,
+  MigrateDomain,
+  FinalizeDomainMigration,
+  CreateDnsProvider,
+  UpdateDnsProvider,
+  DeleteDnsProvider,
+  CreateIngress,
+  UpdateIngress,
+  DeleteIngress,
   // do nothing
   #[default]
   None,
@@ -1473,6 +1490,9 @@ pub enum TerminationSignal {
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[serde(tag = "type", content = "id")]
 pub enum ResourceTarget {
+  Domain(String),
+  DnsProvider(String),
+  Ingress(String),
   System(String),
   Swarm(String),
   Server(String),
@@ -1502,6 +1522,9 @@ impl Default for ResourceTarget {
 impl ResourceTarget {
   pub fn is_empty(&self) -> bool {
     match self {
+      ResourceTarget::Domain(id) => id.is_empty(),
+      ResourceTarget::DnsProvider(id) => id.is_empty(),
+      ResourceTarget::Ingress(id) => id.is_empty(),
       ResourceTarget::System(id) => id.is_empty(),
       ResourceTarget::Swarm(id) => id.is_empty(),
       ResourceTarget::Server(id) => id.is_empty(),
@@ -1525,6 +1548,9 @@ impl ResourceTarget {
     &self,
   ) -> (ResourceTargetVariant, &String) {
     let id = match self {
+      ResourceTarget::Domain(id) => id,
+      ResourceTarget::DnsProvider(id) => id,
+      ResourceTarget::Ingress(id) => id,
       ResourceTarget::System(id) => id,
       ResourceTarget::Swarm(id) => id,
       ResourceTarget::Server(id) => id,
@@ -1606,6 +1632,9 @@ impl ResourceTargetVariant {
   /// These need to use snake case
   pub fn toml_header(&self) -> &'static str {
     match self {
+      ResourceTargetVariant::Domain => "domain",
+      ResourceTargetVariant::DnsProvider => "dns_provider",
+      ResourceTargetVariant::Ingress => "ingress",
       ResourceTargetVariant::System => "system",
       ResourceTargetVariant::Swarm => "swarm",
       ResourceTargetVariant::Server => "server",
@@ -1658,6 +1687,11 @@ pub fn resource_link(
   id: &str,
 ) -> String {
   let path = match resource_type {
+    ResourceTargetVariant::Domain => format!("/domains/{id}"),
+    ResourceTargetVariant::DnsProvider => {
+      format!("/dns-providers/{id}")
+    }
+    ResourceTargetVariant::Ingress => format!("/ingresses/{id}"),
     ResourceTargetVariant::System => unreachable!(),
     ResourceTargetVariant::Swarm => format!("/swarms/{id}"),
     ResourceTargetVariant::Server => {
@@ -1735,5 +1769,21 @@ impl SwarmOrServer {
       return None;
     };
     Some(&server.name)
+  }
+}
+
+impl From<&domain::Domain> for ResourceTarget {
+  fn from(r: &domain::Domain) -> Self {
+    Self::Domain(r.id.clone())
+  }
+}
+impl From<&domain::DnsProvider> for ResourceTarget {
+  fn from(r: &domain::DnsProvider) -> Self {
+    Self::DnsProvider(r.id.clone())
+  }
+}
+impl From<&domain::Ingress> for ResourceTarget {
+  fn from(r: &domain::Ingress) -> Self {
+    Self::Ingress(r.id.clone())
   }
 }

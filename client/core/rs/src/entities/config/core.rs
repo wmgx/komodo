@@ -332,6 +332,10 @@ fn default_core_config_paths() -> Vec<PathBuf> {
 /// Refer to the [example file](https://github.com/moghtech/komodo/blob/main/config/core.config.toml) for a full example.
 #[derive(Debug, Clone, Deserialize)]
 pub struct CoreConfig {
+  #[serde(default)]
+  pub domain_management_enabled: bool,
+  #[serde(default)]
+  pub domain_instance_id: String,
   // ===========
   // = General =
   // ===========
@@ -931,6 +935,8 @@ fn default_ssl_cert_file() -> String {
 impl Default for CoreConfig {
   fn default() -> Self {
     Self {
+      domain_management_enabled: false,
+      domain_instance_id: String::new(),
       title: default_title(),
       host: default_host(),
       port: default_core_port(),
@@ -1016,6 +1022,8 @@ impl CoreConfig {
   pub fn sanitized(&self) -> CoreConfig {
     let config = self.clone();
     CoreConfig {
+      domain_management_enabled: config.domain_management_enabled,
+      domain_instance_id: config.domain_instance_id,
       title: config.title,
       host: config.host,
       port: config.port,

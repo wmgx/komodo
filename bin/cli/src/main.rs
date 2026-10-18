@@ -15,8 +15,10 @@ async fn app() -> anyhow::Result<()> {
   rustls::crypto::aws_lc_rs::default_provider()
     .install_default()
     .expect("Failed to install default crypto provider");
-  mogh_logger::init(&config::cli_config().cli_logging)?;
   let args = config::cli_args();
+  if !args.command.is_domain_management() {
+    mogh_logger::init(&config::cli_config().cli_logging)?;
+  }
   let env = config::cli_env();
   let debug_load =
     args.debug_startup.unwrap_or(env.komodo_cli_debug_startup);
@@ -44,6 +46,9 @@ async fn app() -> anyhow::Result<()> {
         );
       }
       Ok(())
+    }
+    args::Command::Domain(args) => {
+      command::domain::handle(args).await
     }
     args::Command::CoreInfo => command::core_info::handle().await,
     args::Command::Container(container) => {

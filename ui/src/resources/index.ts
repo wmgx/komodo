@@ -16,9 +16,11 @@ import { BoxProps, TableProps } from "@mantine/core";
 
 export type UsableResourceTarget = Exclude<
   Types.ResourceTarget,
-  { type: "System" }
+  { type: "System" | "Domain" | "DnsProvider" | "Ingress" }
 >;
-export type UsableResource = Exclude<Types.ResourceTarget["type"], "System">;
+// Domain resources have explicit plan/apply routes and cannot use legacy
+// generic Copy/Delete actions, which bypass their lifecycle.
+export type UsableResource = UsableResourceTarget["type"];
 
 export const RESOURCE_TARGETS = [
   "Server",

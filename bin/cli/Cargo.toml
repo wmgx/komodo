@@ -38,3 +38,5 @@ tokio.workspace = true
 serde.workspace = true
 clap.workspace = true
 envy.workspace = true
+toml.workspace = true
+uuid.workspace = true

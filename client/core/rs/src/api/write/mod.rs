@@ -1,3 +1,5 @@
+mod domain;
+pub use domain::*;
 mod action;
 mod alert;
 mod alerter;

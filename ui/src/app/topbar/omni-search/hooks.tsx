@@ -1,3 +1,4 @@
+import { displayHostname } from "@/resources/domain/hostname";
 import {
   SettingsView,
   useAllResources,
@@ -108,6 +109,13 @@ export function useOmniSearch(opened: boolean) {
     placeholderData: keepPreviousData,
   }).data;
 
+  const domainEnabled =
+    useRead("GetCoreInfo", {}).data?.domain_management_enabled ?? false;
+  const domains = useRead(
+    "ListDomains",
+    { query: { terms: debouncedTerms }, limit: 10 },
+    { enabled: opened && domainEnabled, refetchInterval: 15_000 },
+  ).data;
   const user = useUser().data;
   const resources = useAllResources(debouncedTerms, 10, 15_000, opened);
   const [_, setSettingsView] = useSettingsView();
@@ -117,6 +125,25 @@ export function useOmniSearch(opened: boolean) {
       {
         group: "",
         actions: [
+          ...(domainEnabled
+            ? [
+                {
+                  id: "Domains",
+                  label: "Domains",
+                  onClick: () => nav("/domains"),
+                },
+                {
+                  id: "DnsProviders",
+                  label: "DNS connections",
+                  onClick: () => nav("/dns-providers"),
+                },
+                {
+                  id: "Ingresses",
+                  label: "Ingress connections",
+                  onClick: () => nav("/ingresses"),
+                },
+              ]
+            : []),
           {
             id: "Dashboard",
             label: "Dashboard",
@@ -243,6 +270,16 @@ export function useOmniSearch(opened: boolean) {
       }),
 
       {
+        group: "Domains",
+        actions:
+          domains?.map((domain) => ({
+            id: `domain-${domain._id?.$oid}`,
+            label: domain.name,
+            description: `${displayHostname(domain)} · ${domain.info?.state}`,
+            onClick: () => nav(`/domains/${domain._id?.$oid}`),
+          })) ?? [],
+      },
+      {
         group: "Services",
         actions:
           services?.map((service) => {
@@ -299,6 +336,8 @@ export function useOmniSearch(opened: boolean) {
     ];
   }, [
     resources,
+    domains,
+    domainEnabled,
     containers,
     services,
     terminals,

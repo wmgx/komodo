@@ -282,6 +282,8 @@ pub fn core_config() -> &'static CoreConfig {
       },
 
       // Non secrets
+      domain_management_enabled: config.domain_management_enabled,
+      domain_instance_id: config.domain_instance_id,
       title: env.komodo_title.unwrap_or(config.title),
       host: env.komodo_host.unwrap_or(config.host),
       port: env.komodo_port.unwrap_or(config.port),

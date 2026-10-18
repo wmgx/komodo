@@ -1,4 +1,6 @@
+mod domain;
 use clap::{Parser, Subcommand};
+pub use domain::*;
 use mogh_resolver::HasResponse;
 use serde::{Deserialize, Serialize};
 use strum::{AsRefStr, Display, EnumDiscriminants, EnumString};
@@ -81,6 +83,10 @@ pub trait KomodoExecuteRequest: HasResponse {}
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[serde(tag = "type", content = "params")]
 pub enum Execution {
+  ReconcileDomain(ReconcileDomain),
+  RemoveDomain(RemoveDomain),
+  MigrateDomain(MigrateDomain),
+  FinalizeDomainMigration(FinalizeDomainMigration),
   /// The "null" execution. Does nothing.
   None(NoData),
 

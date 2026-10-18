@@ -14,6 +14,7 @@ mod auth;
 mod cloud;
 mod config;
 mod connection;
+mod domain;
 mod helpers;
 mod monitor;
 mod network;
@@ -59,6 +60,20 @@ async fn app() -> anyhow::Result<()> {
     let _ = &auth::JWT_PROVIDER;
     // Init db_client check to crash on db init failure
     state::init_db_client().await;
+    if config.domain_management_enabled {
+      if let Err(error) = async {
+        domain::validation::enabled()?;
+        domain::lease::start_controller().await?;
+        domain::recover_interrupted().await?;
+        anyhow::Ok(())
+      }
+      .await
+      {
+        error!("Domain controller initialization failed: {error}");
+        std::process::exit(1);
+      }
+      domain::start_automatic();
+    }
     // Run after db connection.
     startup::on_startup().await;
 

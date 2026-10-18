@@ -322,6 +322,22 @@ pub async fn get_updates_for_execution(
     .map(|mut p| {
       // replace the ids with names
       match &mut p.resource_target {
+        ResourceTarget::Domain(id) => {
+          if let Some(resource) = all_resources.domains.get(id) {
+            *id = resource.name.clone();
+          }
+        }
+        ResourceTarget::DnsProvider(id) => {
+          if let Some(resource) = all_resources.dns_providers.get(id)
+          {
+            *id = resource.name.clone();
+          }
+        }
+        ResourceTarget::Ingress(id) => {
+          if let Some(resource) = all_resources.ingresses.get(id) {
+            *id = resource.name.clone();
+          }
+        }
         ResourceTarget::System(_) => {}
         ResourceTarget::Swarm(id) => {
           *id = all_resources
@@ -937,6 +953,47 @@ async fn expand_user_group_permissions(
           });
         expanded.extend(permissions);
       }
+      ResourceTargetVariant::Domain => {
+        expanded.extend(
+          all_resources
+            .domains
+            .values()
+            .filter(|resource| matcher.is_match(&resource.name))
+            .map(|resource| PermissionToml {
+              target: ResourceTarget::Domain(resource.name.clone()),
+              level: permission.level,
+              specific: permission.specific.clone(),
+            }),
+        );
+      }
+      ResourceTargetVariant::DnsProvider => {
+        expanded.extend(
+          all_resources
+            .dns_providers
+            .values()
+            .filter(|resource| matcher.is_match(&resource.name))
+            .map(|resource| PermissionToml {
+              target: ResourceTarget::DnsProvider(
+                resource.name.clone(),
+              ),
+              level: permission.level,
+              specific: permission.specific.clone(),
+            }),
+        );
+      }
+      ResourceTargetVariant::Ingress => {
+        expanded.extend(
+          all_resources
+            .ingresses
+            .values()
+            .filter(|resource| matcher.is_match(&resource.name))
+            .map(|resource| PermissionToml {
+              target: ResourceTarget::Ingress(resource.name.clone()),
+              level: permission.level,
+              specific: permission.specific.clone(),
+            }),
+        );
+      }
       ResourceTargetVariant::System => {}
     }
   }
@@ -1135,6 +1192,21 @@ pub async fn convert_user_groups(
             .get(id)
             .map(|r| r.name.clone())
             .unwrap_or_default()
+        }
+        ResourceTarget::Domain(id) => {
+          if let Some(resource) = all.domains.get(id) {
+            *id = resource.name.clone();
+          }
+        }
+        ResourceTarget::DnsProvider(id) => {
+          if let Some(resource) = all.dns_providers.get(id) {
+            *id = resource.name.clone();
+          }
+        }
+        ResourceTarget::Ingress(id) => {
+          if let Some(resource) = all.ingresses.get(id) {
+            *id = resource.name.clone();
+          }
         }
         ResourceTarget::System(_) => {}
       }

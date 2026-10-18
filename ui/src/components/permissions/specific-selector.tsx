@@ -20,11 +20,13 @@ const ALL_PERMISSIONS_BY_TYPE: {
     Types.SpecificPermission.Processes,
   ],
   Stack: [
+    Types.SpecificPermission.AttachDomain,
     Types.SpecificPermission.Inspect,
     Types.SpecificPermission.Logs,
     Types.SpecificPermission.Terminal,
   ],
   Deployment: [
+    Types.SpecificPermission.AttachDomain,
     Types.SpecificPermission.Inspect,
     Types.SpecificPermission.Logs,
     Types.SpecificPermission.Terminal,
@@ -32,6 +34,8 @@ const ALL_PERMISSIONS_BY_TYPE: {
   Build: [Types.SpecificPermission.Attach],
   Repo: [Types.SpecificPermission.Attach],
   Builder: [Types.SpecificPermission.Attach],
+  DnsProvider: [Types.SpecificPermission.Attach],
+  Ingress: [Types.SpecificPermission.Attach],
 };
 
 export interface SpecificPermissionSelectorProps extends Omit<

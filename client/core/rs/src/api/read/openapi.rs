@@ -5,6 +5,19 @@ use crate::api::read;
 #[derive(OpenApi)]
 #[openapi(
   paths(
+    read::get_domain,
+    read::list_domains,
+    read::get_dns_provider,
+    read::list_dns_providers,
+    read::get_ingress,
+    read::list_ingresses,
+    read::get_domain_status,
+    read::list_domain_adapters,
+    read::get_domain_adapter_capabilities,
+    read::plan_domain_change,
+    read::get_domain_plan,
+    read::validate_domain_connection,
+
     // misc
     read::get_version,
     read::get_core_info,

@@ -13,10 +13,12 @@ const gen_command =
 exec(gen_command, (error, _stdout, _stderr) => {
   if (error) {
     console.error(error);
+    process.exitCode = 1;
     return;
   }
   console.log("generated types using typeshare");
   fix_types();
+  fix_domain_responses();
   console.log("finished.");
 });
 
@@ -42,6 +44,33 @@ function fix_types() {
       ", PermissionLevelAndSpecifics",
       ", PermissionLevelAndSpecifics | PermissionLevel"
     )
-    .replaceAll("IndexMap", "Record");
+    .replaceAll("IndexMap", "Record")
+    .replace(/[ \t]+$/gm, "");
   writeFileSync(types_path, fixed);
+}
+
+// Keep the new workflow's response map derived from the Rust Resolve contract.
+function fix_domain_responses() {
+  const responsesPath = path.join(__dirname, "src/responses.ts");
+  let contents = readFileSync(responsesPath, "utf8");
+  for (const kind of ["read", "write", "execute"]) {
+    const source = readFileSync(path.join(__dirname, `../rs/src/api/${kind}/domain.rs`), "utf8");
+    const entries = [...source.matchAll(/#\[response\(([^)]+)\)\][\s\S]*?pub struct (\w+)/g)].map(([, response, name]) => {
+      const vector = response.match(/^Vec<(.+)>$/);
+      const type = vector ? `Types.${vector[1]}[]` : `Types.${response}`;
+      return `  ${name}: ${type};`;
+    });
+    if (!entries.length) throw new Error(`No domain ${kind} response contracts found`);
+    const title = kind[0].toUpperCase() + kind.slice(1);
+    const marker = `  // BEGIN GENERATED DOMAIN ${kind.toUpperCase()}\n`;
+    const end = `  // END GENERATED DOMAIN ${kind.toUpperCase()}\n`;
+    const startAt = contents.indexOf(marker);
+    if (startAt >= 0) {
+      const endAt = contents.indexOf(end, startAt);
+      if (endAt < 0) throw new Error("Unclosed domain response generation marker");
+      contents = contents.slice(0, startAt) + contents.slice(endAt + end.length);
+    }
+    contents = contents.replace(`export type ${title}Responses = {\n`, `export type ${title}Responses = {\n${marker}${entries.join("\n")}\n${end}`);
+  }
+  writeFileSync(responsesPath, contents);
 }

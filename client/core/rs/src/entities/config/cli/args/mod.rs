@@ -7,6 +7,7 @@ use crate::api::execute::Execution;
 pub mod container;
 pub mod create;
 pub mod database;
+pub mod domain;
 pub mod list;
 pub mod terminal;
 pub mod update;
@@ -40,6 +41,8 @@ pub struct CliArgs {
 
 #[derive(Debug, Clone, clap::Subcommand)]
 pub enum Command {
+  /// Plan and manage domain bindings through Core.
+  Domain(domain::Domain),
   /// Print the CLI config being used. (aliases: `cfg`, `cf`)
   #[clap(alias = "cfg", alias = "cf")]
   Config {
@@ -134,7 +137,7 @@ pub struct Execute {
   #[arg(long, short = 's')]
   pub secret: Option<String>,
   /// Always continue on user confirmation prompts.
-  #[arg(long, short = 'y', default_value_t = false)]
+  #[arg(long, short = 'y', global = true, default_value_t = false)]
   pub yes: bool,
 }
 
@@ -170,5 +173,30 @@ impl From<CliEnabled> for bool {
       CliEnabled::Yes => true,
       CliEnabled::No => false,
     }
+  }
+}
+
+impl Command {
+  /// Whether output belongs to the domain.v1 contract.
+  pub fn is_domain_management(&self) -> bool {
+    matches!(
+      self,
+      Self::Domain(_)
+        | Self::Execute(Execute {
+          execution: Execution::ReconcileDomain(_)
+            | Execution::RemoveDomain(_)
+            | Execution::MigrateDomain(_)
+            | Execution::FinalizeDomainMigration(_),
+          ..
+        })
+        | Self::List(list::List {
+          command: Some(
+            list::ListCommand::Domains(_)
+              | list::ListCommand::DnsProviders(_)
+              | list::ListCommand::Ingresses(_)
+          ),
+          ..
+        })
+    )
   }
 }

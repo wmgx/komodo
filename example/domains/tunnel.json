@@ -1,0 +1,11 @@
+{
+  "name": "tunnel-home",
+  "config": {
+    "schema_version": 1,
+    "adapter": { "type": "CloudflareTunnelV1", "params": { "account_id": "REPLACE_ACCOUNT_ID", "tunnel_id": "REPLACE_TUNNEL_ID", "secret": { "source": "CoreSecret", "name": "CLOUDFLARE_API_TOKEN" }, "dedicated": true } },
+    "allowed_hostname_suffixes": ["example.com"],
+    "allowed_networks": ["http://app:8080"],
+    "tls_profiles": [{ "name": "https", "mode": "RequireHttps", "certificate_resolver": "", "requires_dns": false }],
+    "drain_seconds": 60
+  }
+}

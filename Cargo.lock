@@ -2254,7 +2254,6 @@ dependencies = [
  "komodo_client",
  "mogh_cache",
  "tokio",
- "urlencoding",
 ]
 
 [[package]]
@@ -2899,7 +2898,6 @@ name = "interpolate"
 version = "0.0.0"
 dependencies = [
  "anyhow",
- "formatting",
  "komodo_client",
  "svi",
 ]
@@ -3080,7 +3078,9 @@ dependencies = [
  "serde_qs",
  "tokio",
  "tokio-util",
+ "toml",
  "tracing",
+ "uuid",
  "wildcard",
 ]
 
@@ -3223,6 +3223,7 @@ dependencies = [
  "hickory-resolver",
  "interpolate",
  "komodo_client",
+ "libc",
  "mogh_cache",
  "mogh_config",
  "mogh_error",
@@ -3233,10 +3234,12 @@ dependencies = [
  "mogh_server",
  "periphery_client",
  "portable-pty",
+ "reqwest 0.13.4",
  "rustls 0.23.43",
  "serde",
  "serde_json",
  "serde_yaml_ng",
+ "sha2 0.11.0",
  "shell-escape",
  "shlex 2.0.1",
  "strum 0.28.0",
@@ -3247,6 +3250,7 @@ dependencies = [
  "tokio-util",
  "tracing",
  "transport",
+ "url",
  "urlencoding",
  "uuid",
 ]

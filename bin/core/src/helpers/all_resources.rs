@@ -1,3 +1,4 @@
+use komodo_client::entities::domain::{DnsProvider, Domain, Ingress};
 use std::collections::HashMap;
 
 use komodo_client::entities::{
@@ -8,6 +9,10 @@ use komodo_client::entities::{
 
 #[derive(Debug, Default)]
 pub struct AllResourcesById {
+  pub domains: HashMap<String, Domain>,
+  pub dns_providers: HashMap<String, DnsProvider>,
+  pub ingresses: HashMap<String, Ingress>,
+
   pub swarms: HashMap<String, Swarm>,
   pub servers: HashMap<String, Server>,
   pub deployments: HashMap<String, Deployment>,
@@ -28,6 +33,19 @@ impl AllResourcesById {
     let id_to_tags = &map;
     let match_tags = &[];
     Ok(Self {
+      domains: crate::resource::get_id_to_resource_map::<Domain>(
+        id_to_tags, match_tags,
+      )
+      .await?,
+      dns_providers: crate::resource::get_id_to_resource_map::<
+        DnsProvider,
+      >(id_to_tags, match_tags)
+      .await?,
+      ingresses: crate::resource::get_id_to_resource_map::<Ingress>(
+        id_to_tags, match_tags,
+      )
+      .await?,
+
       swarms: crate::resource::get_id_to_resource_map::<Swarm>(
         id_to_tags, match_tags,
       )

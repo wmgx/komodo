@@ -1,4 +1,6 @@
 import { ICONS } from "@/lib/icons";
+import { useRead } from "@/lib/hooks";
+import { Globe } from "lucide-react";
 import { usableResourcePath } from "@/lib/utils";
 import { SIDEBAR_RESOURCES } from "@/resources";
 import { Button, Divider, ScrollArea, Stack, Text } from "@mantine/core";
@@ -8,6 +10,8 @@ import { Link, useLocation } from "react-router-dom";
 const Sidebar = ({ close }: { close: () => void }) => {
   const location = useLocation().pathname;
   const linkProps = { location, close };
+  const domainEnabled = useRead("GetCoreInfo", {}).data
+    ?.domain_management_enabled;
   return (
     <Stack justify="space-between" gap="md" h="96%" m="xl" mt="24" mr="md">
       {/* TOP AREA (scrolling) */}
@@ -59,6 +63,14 @@ const Sidebar = ({ close }: { close: () => void }) => {
               />
             );
           })}
+          {domainEnabled && (
+            <SidebarLink
+              label="Domains"
+              icon={<Globe size="1rem" />}
+              to="/domains"
+              {...linkProps}
+            />
+          )}
 
           <Divider
             label={

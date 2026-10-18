@@ -1,0 +1,11 @@
+{
+  "name": "cloudflare-home",
+  "config": {
+    "adapter": "CloudflareDnsV1",
+    "schema_version": 1,
+    "account_id": "REPLACE_ACCOUNT_ID",
+    "zone_id": "REPLACE_ZONE_ID",
+    "secret": { "source": "CoreSecret", "name": "CLOUDFLARE_API_TOKEN" },
+    "allowed_hostname_suffixes": ["example.com"]
+  }
+}

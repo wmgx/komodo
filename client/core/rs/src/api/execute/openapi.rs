@@ -5,6 +5,11 @@ use crate::api::execute;
 #[derive(OpenApi)]
 #[openapi(
   paths(
+    execute::reconcile_domain,
+    execute::remove_domain,
+    execute::migrate_domain,
+    execute::finalize_domain_migration,
+
     // swarm
     execute::remove_swarm_nodes,
     execute::update_swarm_node,

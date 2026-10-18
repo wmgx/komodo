@@ -1,3 +1,4 @@
+use komodo_client::entities::domain::{DnsProvider, Domain, Ingress};
 use std::{collections::HashMap, str::FromStr};
 
 use anyhow::{Context, anyhow};
@@ -334,6 +335,15 @@ pub async fn get_user_permission_on_target(
   target: &ResourceTarget,
 ) -> anyhow::Result<PermissionLevelAndSpecifics> {
   match target {
+    ResourceTarget::Domain(id) => {
+      get_user_permission_on_resource::<Domain>(user, id).await
+    }
+    ResourceTarget::DnsProvider(id) => {
+      get_user_permission_on_resource::<DnsProvider>(user, id).await
+    }
+    ResourceTarget::Ingress(id) => {
+      get_user_permission_on_resource::<Ingress>(user, id).await
+    }
     ResourceTarget::System(_) => Ok(PermissionLevel::None.into()),
     ResourceTarget::Swarm(id) => {
       get_user_permission_on_resource::<Swarm>(user, id).await

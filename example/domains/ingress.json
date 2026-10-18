@@ -1,0 +1,12 @@
+{
+  "name": "traefik-home",
+  "config": {
+    "schema_version": 1,
+    "adapter": { "type": "TraefikFileV1", "params": { "server": "home", "entrypoint": "websecure", "dns_target": "192.0.2.1", "dedicated": true } },
+    "allowed_hostname_suffixes": ["example.com"],
+    "allowed_networks": ["http://app:8080"],
+    "docker_network": "web",
+    "tls_profiles": [{ "name": "https", "mode": "RequireHttps", "certificate_resolver": "letsencrypt", "requires_dns": true }],
+    "drain_seconds": 60
+  }
+}

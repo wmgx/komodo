@@ -1,0 +1,28 @@
+# Optional dedicated ingress Stack template. Review and deploy separately.
+# DOMAIN_DIRECTORY must match Periphery's administrator-owned ingress ID mapping.
+services:
+  traefik:
+    image: ${TRAEFIK_IMAGE:?set a reviewed Traefik image tag or digest}
+    restart: unless-stopped
+    command:
+      - --entrypoints.websecure.address=:443
+      - --providers.file.directory=/etc/traefik/dynamic
+      - --providers.file.watch=true
+      # Read-only observation API, published only to host loopback.
+      - --api.insecure=true
+      - --certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL:?set an ACME contact}
+      - --certificatesresolvers.letsencrypt.acme.storage=/acme/acme.json
+      - --certificatesresolvers.letsencrypt.acme.tlschallenge=true
+    ports:
+      - "443:443"
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - ${DOMAIN_DIRECTORY:?set the dedicated dynamic directory}:/etc/traefik/dynamic:ro
+      - certificates:/acme
+    networks:
+      - web
+volumes:
+  certificates:
+networks:
+  web:
+    external: true

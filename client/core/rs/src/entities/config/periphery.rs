@@ -230,6 +230,15 @@ pub struct Env {
 /// Refer to the [example file](https://github.com/moghtech/komodo/blob/main/config/periphery.config.toml) for a full example.
 #[derive(Debug, Clone, Deserialize)]
 pub struct PeripheryConfig {
+  /// Optional administrator-only read endpoint used to verify Traefik loaded domain routes.
+  #[serde(default)]
+  pub domain_ingress_observation_urls:
+    std::collections::HashMap<String, String>,
+  #[serde(default)]
+  pub domain_enabled: bool,
+  #[serde(default)]
+  pub domain_ingress_directories:
+    std::collections::HashMap<String, std::path::PathBuf>,
   /// The private key used with noise handshake.
   ///
   /// Supports openssl generated pem file, `openssl genpkey -algorithm X25519 -out private.key`.
@@ -467,6 +476,9 @@ fn default_ssl_enabled() -> bool {
 impl Default for PeripheryConfig {
   fn default() -> Self {
     Self {
+      domain_ingress_observation_urls: Default::default(),
+      domain_enabled: false,
+      domain_ingress_directories: Default::default(),
       private_key: None,
       onboarding_key: None,
       core_public_keys: None,
@@ -506,6 +518,15 @@ impl Default for PeripheryConfig {
 impl PeripheryConfig {
   pub fn sanitized(&self) -> PeripheryConfig {
     PeripheryConfig {
+      domain_ingress_observation_urls: self
+        .domain_ingress_observation_urls
+        .iter()
+        .map(|(id, url)| (id.clone(), empty_or_redacted(url)))
+        .collect(),
+      domain_enabled: self.domain_enabled,
+      domain_ingress_directories: self
+        .domain_ingress_directories
+        .clone(),
       private_key: self.private_key.as_ref().map(|private_key| {
         if private_key.starts_with("file:") {
           private_key.clone()

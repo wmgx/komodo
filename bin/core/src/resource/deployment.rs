@@ -285,6 +285,18 @@ impl super::KomodoResource for Deployment {
     deployment: &Resource<Self::Config, Self::Info>,
     update: &mut Update,
   ) -> anyhow::Result<()> {
+    if db_client().domain_ownership.find_one(doc! { "cleaned": { "$ne": true }, "$or": [
+      { "references": &deployment.id },
+      { "config.target.type": "Deployment", "config.target.params.id": &deployment.id },
+      { "old.config.target.type": "Deployment", "old.config.target.params.id": &deployment.id }
+    ] }).await?.is_some() {
+      anyhow::bail!("Resource is still owned by a Domain route; complete cleanup or explicit abandon first");
+    }
+
+    if db_client().domains.find_one(doc! { "config.target.type": "Deployment", "config.target.params.id": &deployment.id }).await?.is_some() {
+      anyhow::bail!("Resource is referenced by a Domain; remove or migrate the binding first");
+    }
+
     if deployment.config.swarm_id.is_empty()
       && deployment.config.server_id.is_empty()
     {

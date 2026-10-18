@@ -76,9 +76,9 @@ export function UpdateDetailsContent({ id }: { id: string }) {
   }
 
   const Components =
-    update.target.type === "System"
-      ? null
-      : ResourceComponents[update.target.type];
+    update.target.type in ResourceComponents
+      ? ResourceComponents[update.target.type as UsableResource]
+      : null;
 
   return (
     <Stack gap="xl" m="md">
@@ -99,9 +99,14 @@ export function UpdateDetailsContent({ id }: { id: string }) {
 
         {/** RESOURCE / VERSION */}
         <Group>
-          {Components ? (
+          {Components || update.target.type !== "System" ? (
             <ResourceLink
-              type={update.target.type as UsableResource}
+              type={
+                update.target.type as Exclude<
+                  typeof update.target.type,
+                  "System"
+                >
+              }
               id={update.target.id}
               onClick={close}
               fz="md"

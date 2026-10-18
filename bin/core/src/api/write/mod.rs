@@ -24,6 +24,7 @@ mod alerter;
 mod build;
 mod builder;
 mod deployment;
+mod domain;
 mod onboarding;
 mod permissions;
 mod procedure;
@@ -60,6 +61,16 @@ pub struct WriteArgs {
 #[error(mogh_error::Error)]
 #[serde(tag = "type", content = "params")]
 pub enum WriteRequest {
+  CreateDomain(CreateDomain),
+  UpdateDomain(UpdateDomain),
+  DeleteDomain(DeleteDomain),
+  CreateDnsProvider(CreateDnsProvider),
+  UpdateDnsProvider(UpdateDnsProvider),
+  DeleteDnsProvider(DeleteDnsProvider),
+  CreateIngress(CreateIngress),
+  UpdateIngress(UpdateIngress),
+  DeleteIngress(DeleteIngress),
+
   // ==== RESOURCE ====
   UpdateResourceMeta(UpdateResourceMeta),
 

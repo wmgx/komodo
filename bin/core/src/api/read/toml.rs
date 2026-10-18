@@ -10,11 +10,22 @@ use komodo_client::{
     ListUserGroups,
   },
   entities::{
-    ResourceTarget, action::Action, alerter::Alerter, build::Build,
-    builder::Builder, deployment::Deployment,
-    permission::PermissionLevel, procedure::Procedure, repo::Repo,
-    resource::ResourceQuery, server::Server, stack::Stack,
-    swarm::Swarm, sync::ResourceSync, toml::ResourcesToml,
+    ResourceTarget,
+    action::Action,
+    alerter::Alerter,
+    build::Build,
+    builder::Builder,
+    deployment::Deployment,
+    domain::{DnsProvider, Domain, Ingress},
+    permission::PermissionLevel,
+    procedure::Procedure,
+    repo::Repo,
+    resource::ResourceQuery,
+    server::Server,
+    stack::Stack,
+    swarm::Swarm,
+    sync::ResourceSync,
+    toml::ResourcesToml,
     user::User,
   },
 };
@@ -81,6 +92,9 @@ async fn get_all_targets(
     Procedure,
     Action,
     ResourceSync,
+    Domain,
+    DnsProvider,
+    Ingress,
   );
 
   Ok(targets)
@@ -212,6 +226,15 @@ impl Resolve<ReadArgs> for ExportResourcesToToml {
             ))
           }
         }
+        ResourceTarget::Domain(id) => {
+          convert_target!(id, Domain, domains)
+        }
+        ResourceTarget::DnsProvider(id) => {
+          convert_target!(id, DnsProvider, dns_providers)
+        }
+        ResourceTarget::Ingress(id) => {
+          convert_target!(id, Ingress, ingresses)
+        }
         ResourceTarget::System(_) => continue,
       };
     }
@@ -284,6 +307,9 @@ fn serialize_resources_toml(
     };
   }
   serialize_resources!(
+    (DnsProvider, dns_providers, "dns_provider"),
+    (Ingress, ingresses, "ingress"),
+    (Domain, domains, "domain"),
     (Server, servers, "server"),
     (Swarm, swarms, "swarm"),
     (Stack, stacks, "stack"),

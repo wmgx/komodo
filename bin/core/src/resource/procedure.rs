@@ -264,6 +264,26 @@ async fn validate_config(
                 .try_collect::<Vec<_>>()
                 .await?;
             }
+Execution::ReconcileDomain(params) => {
+ let required = if params.plan_id.is_empty() { PermissionLevel::Execute } else { PermissionLevel::Write };
+ let domain = super::get_check_permissions::<komodo_client::entities::domain::Domain>(&params.domain,user,required.into()).await?;
+ params.domain = domain.id;
+},
+Execution::RemoveDomain(params) => {
+ let required = PermissionLevel::Write;
+ let domain = super::get_check_permissions::<komodo_client::entities::domain::Domain>(&params.domain,user,required.into()).await?;
+ params.domain = domain.id;
+},
+Execution::MigrateDomain(params) => {
+ let required = PermissionLevel::Write;
+ let domain = super::get_check_permissions::<komodo_client::entities::domain::Domain>(&params.domain,user,required.into()).await?;
+ params.domain = domain.id;
+},
+Execution::FinalizeDomainMigration(params) => {
+ let required = PermissionLevel::Write;
+ let domain = super::get_check_permissions::<komodo_client::entities::domain::Domain>(&params.domain,user,required.into()).await?;
+ params.domain = domain.id;
+},
             Execution::None(_) | Execution::Sleep(_) => {}
           }
         };

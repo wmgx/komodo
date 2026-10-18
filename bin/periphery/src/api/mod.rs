@@ -7,8 +7,8 @@ use komodo_client::entities::{
 };
 use mogh_resolver::Resolve;
 use periphery_client::api::{
-  build::*, compose::*, container::*, docker::*, git::*, keys::*,
-  poll::*, stats::*, swarm::*, terminal::*, *,
+  build::*, compose::*, container::*, docker::*, domain::*, git::*,
+  keys::*, poll::*, stats::*, swarm::*, terminal::*, *,
 };
 use serde::{Deserialize, Serialize};
 use strum::EnumDiscriminants;
@@ -22,6 +22,7 @@ mod build;
 mod compose;
 mod container;
 mod docker;
+mod domain;
 mod git;
 mod keys;
 mod poll;
@@ -45,6 +46,11 @@ pub struct Args {
 #[serde(tag = "type", content = "params")]
 #[allow(clippy::enum_variant_names, clippy::large_enum_variant)]
 pub enum PeripheryRequest {
+  GetDomainIngressCapabilities(GetDomainIngressCapabilities),
+  ObserveDomainRoute(ObserveDomainRoute),
+  ApplyDomainRoute(ApplyDomainRoute),
+  RemoveDomainRoute(RemoveDomainRoute),
+
   // Stats / Info (Read)
   PollStatus(PollStatus),
   GetHealth(GetHealth),

@@ -1,3 +1,5 @@
+mod domain;
+pub use domain::*;
 use mogh_resolver::{HasResponse, Resolve};
 use serde::{Deserialize, Serialize};
 use typeshare::typeshare;
@@ -124,6 +126,9 @@ pub struct GetCoreInfo {}
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 pub struct GetCoreInfoResponse {
+  /// Domain management is explicitly enabled by this Core administrator.
+  #[serde(default)]
+  pub domain_management_enabled: bool,
   /// The title assigned to this core api.
   pub title: String,
   /// The monitoring interval of this core api.

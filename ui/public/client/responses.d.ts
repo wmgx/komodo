@@ -1,5 +1,17 @@
 import * as Types from "./types.js";
 export type ReadResponses = {
+    GetDomain: Types.Domain;
+    ListDomains: Types.Domain[];
+    GetDnsProvider: Types.DnsProvider;
+    ListDnsProviders: Types.DnsProvider[];
+    GetIngress: Types.Ingress;
+    ListIngresses: Types.Ingress[];
+    GetDomainStatus: Types.DomainStatus;
+    ListDomainAdapters: Types.DomainAdapterCapabilities[];
+    GetDomainAdapterCapabilities: Types.DomainAdapterCapabilities;
+    PlanDomainChange: Types.DomainPlan;
+    GetDomainPlan: Types.DomainPlan;
+    ValidateDomainConnection: Types.DomainConnectionValidation;
     GetVersion: Types.GetVersionResponse;
     GetCoreInfo: Types.GetCoreInfoResponse;
     ListSecrets: Types.ListSecretsResponse;
@@ -142,6 +154,15 @@ export type ReadResponses = {
     ListOnboardingKeys: Types.ListOnboardingKeysResponse;
 };
 export type WriteResponses = {
+    CreateDomain: Types.Domain;
+    UpdateDomain: Types.Domain;
+    DeleteDomain: Types.Domain;
+    CreateDnsProvider: Types.DnsProvider;
+    UpdateDnsProvider: Types.DnsProvider;
+    DeleteDnsProvider: Types.DnsProvider;
+    CreateIngress: Types.Ingress;
+    UpdateIngress: Types.Ingress;
+    DeleteIngress: Types.Ingress;
     UpdateResourceMeta: Types.UpdateResourceMetaResponse;
     CreateSwarm: Types.Swarm;
     CopySwarm: Types.Swarm;
@@ -258,6 +279,10 @@ export type WriteResponses = {
     CloseAlert: Types.NoData;
 };
 export type ExecuteResponses = {
+    ReconcileDomain: Types.Update;
+    RemoveDomain: Types.Update;
+    MigrateDomain: Types.Update;
+    FinalizeDomainMigration: Types.Update;
     DeployStack: Types.Update;
     BatchDeployStack: Types.BatchExecutionResponse;
     DeployStackIfChanged: Types.Update;

@@ -10,6 +10,7 @@ use komodo_client::entities::{
   builder::Builder,
   config::DatabaseConfig,
   deployment::Deployment,
+  domain::{DnsProvider, Domain, Ingress},
   onboarding_key::OnboardingKey,
   permission::Permission,
   procedure::Procedure,
@@ -40,10 +41,18 @@ pub use mongo_indexed;
 pub use mungos;
 pub use mungos::mongodb::bson;
 
+pub mod domain;
 pub mod utils;
 
 #[derive(Debug)]
 pub struct Client {
+  pub domains: Collection<Domain>,
+  pub dns_providers: Collection<DnsProvider>,
+  pub ingresses: Collection<Ingress>,
+  pub domain_plans: Collection<Document>,
+  pub domain_operations: Collection<Document>,
+  pub domain_leases: Collection<Document>,
+  pub domain_ownership: Collection<Document>,
   pub users: Collection<User>,
   pub user_groups: Collection<UserGroup>,
   pub permissions: Collection<Permission>,
@@ -82,6 +91,13 @@ impl Client {
 
   pub async fn from_database(db: Database) -> anyhow::Result<Client> {
     let client = Client {
+      domains: resource_collection(&db, "Domain").await?,
+      dns_providers: resource_collection(&db, "DnsProvider").await?,
+      ingresses: resource_collection(&db, "Ingress").await?,
+      domain_plans: db.collection("DomainPlan"),
+      domain_operations: db.collection("DomainOperation"),
+      domain_leases: db.collection("DomainLease"),
+      domain_ownership: db.collection("DomainOwnership"),
       users: mongo_indexed::collection(&db, true).await?,
       user_groups: mongo_indexed::collection(&db, true).await?,
       permissions: mongo_indexed::collection(&db, true).await?,
@@ -110,6 +126,12 @@ impl Client {
       //
       db,
     };
+    create_unique_index(&client.domains, "config.hostname").await?;
+    create_unique_index(&client.domain_operations, "request_id")
+      .await?;
+    create_index(&client.domain_plans, "public.expires_at").await?;
+    create_index(&client.domain_operations, "domain_id").await?;
+    create_index(&client.domain_ownership, "references").await?;
     Ok(client)
   }
 

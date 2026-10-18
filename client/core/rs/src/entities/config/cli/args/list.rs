@@ -82,6 +82,9 @@ impl From<List> for ResourceFilters {
 
 #[derive(Debug, Clone, clap::Subcommand)]
 pub enum ListCommand {
+  Domains(ResourceFilters),
+  DnsProviders(ResourceFilters),
+  Ingresses(ResourceFilters),
   /// List Servers (aliases: `server`, `sv`)
   #[clap(alias = "server", alias = "sv")]
   Servers(ResourceFilters),

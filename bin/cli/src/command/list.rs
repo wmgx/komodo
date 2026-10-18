@@ -52,6 +52,36 @@ use crate::{
 
 pub async fn handle(list: &args::list::List) -> anyhow::Result<()> {
   match &list.command {
+    Some(ListCommand::Domains(filters))
+    | Some(ListCommand::DnsProviders(filters))
+    | Some(ListCommand::Ingresses(filters)) => {
+      use args::domain::*;
+      let f = Filters {
+        names: filters.names.clone(),
+        tags: filters.tags.clone(),
+      };
+      let command = match &list.command {
+        Some(ListCommand::Domains(_)) => DomainCommand::List(f),
+        Some(ListCommand::DnsProviders(_)) => {
+          DomainCommand::Provider {
+            command: ConnectionCommand::List(f),
+          }
+        }
+        _ => DomainCommand::Ingress {
+          command: ConnectionCommand::List(f),
+        },
+      };
+      super::domain::handle(&Domain {
+        command,
+        format: match filters.format {
+          args::CliFormat::Json => DomainFormat::Json,
+          _ => DomainFormat::Table,
+        },
+        yes: false,
+        request_id: None,
+      })
+      .await
+    }
     None => list_all(list).await,
     Some(ListCommand::Servers(filters)) => {
       list_resources::<ServerListItem>(filters, list.page, false)

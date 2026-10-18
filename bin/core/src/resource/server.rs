@@ -211,6 +211,50 @@ impl super::KomodoResource for Server {
     let db = db_client();
 
     let id = &resource.id;
+    if db
+      .domain_ownership
+      .find_one(doc! { "cleaned": { "$ne": true }, "references": id })
+      .await?
+      .is_some()
+    {
+      anyhow::bail!(
+        "Server is still referenced by a Domain route; complete cleanup or abandon first"
+      );
+    }
+
+    if db.ingresses.find_one(doc! { "config.adapter.type": "TraefikFileV1", "config.adapter.params.server": id }).await?.is_some() {
+      anyhow::bail!("Server is referenced by a Domain ingress; migrate and remove that ingress first");
+    }
+    let deployments = database::mungos::find::find_collect(
+      &db.deployments,
+      doc! { "config.server_id": id },
+      None,
+    )
+    .await?;
+    let stacks = database::mungos::find::find_collect(
+      &db.stacks,
+      doc! { "config.server_id": id },
+      None,
+    )
+    .await?;
+    let deployment_ids =
+      deployments.into_iter().map(|r| r.id).collect::<Vec<_>>();
+    let stack_ids =
+      stacks.into_iter().map(|r| r.id).collect::<Vec<_>>();
+    if db.domain_ownership.find_one(doc! { "cleaned": { "$ne": true }, "$or": [
+      { "config.target.type": "Deployment", "config.target.params.id": { "$in": &deployment_ids } },
+      { "config.target.type": "StackService", "config.target.params.stack_id": { "$in": &stack_ids } },
+      { "old.config.target.type": "Deployment", "old.config.target.params.id": { "$in": &deployment_ids } },
+      { "old.config.target.type": "StackService", "old.config.target.params.stack_id": { "$in": &stack_ids } }
+    ] }).await?.is_some() {
+      anyhow::bail!("Server hosts a previously published Domain target; complete cleanup first");
+    }
+    if db.domains.find_one(doc! { "$or": [
+      { "config.target.type": "Deployment", "config.target.params.id": { "$in": deployment_ids } },
+      { "config.target.type": "StackService", "config.target.params.stack_id": { "$in": stack_ids } }
+    ] }).await?.is_some() {
+      anyhow::bail!("Server hosts a Domain target; remove or migrate the binding first");
+    }
 
     db.builders
       .update_many(

@@ -263,6 +263,9 @@ pub fn extend_resources(
     alerters,
     builders,
     resource_syncs,
+    domains,
+    dns_providers,
+    ingresses,
   );
   resources.user_groups.extend(more.user_groups);
   resources.variables.extend(more.variables);
@@ -278,4 +281,54 @@ fn filter_by_tag<T: Default>(
       match_tags.iter().all(|tag| resource.tags.contains(tag))
     })
     .collect()
+}
+
+#[cfg(test)]
+mod domain_tests {
+  use super::*;
+
+  #[test]
+  fn domain_resources_survive_multi_file_tag_filtering() {
+    let input = r#"
+[[dns_provider]]
+name = "dns"
+tags = ["public"]
+[dns_provider.config]
+adapter = "CloudflareDnsV1"
+schema_version = 1
+
+[[ingress]]
+name = "entry"
+tags = ["public"]
+[ingress.config]
+schema_version = 1
+
+[[domain]]
+name = "app"
+tags = ["public"]
+deploy = false
+[domain.config]
+hostname = "app.example.com"
+ingress = "entry"
+
+[[domain]]
+name = "private"
+tags = ["private"]
+[domain.config]
+hostname = "private.example.com"
+ingress = "entry"
+"#;
+    let parsed =
+      crate::sync::deserialize_resources_toml(input).unwrap();
+    let mut resources = ResourcesToml::default();
+    extend_resources(&mut resources, parsed, &["public".into()]);
+    assert_eq!(resources.domains.len(), 1);
+    assert_eq!(resources.domains[0].name, "app");
+    assert!(!resources.domains[0].deploy);
+    assert_eq!(resources.dns_providers.len(), 1);
+    assert_eq!(resources.ingresses.len(), 1);
+    let exported = serde_json::to_string(&resources).unwrap();
+    assert!(!exported.contains("plan_id"));
+    assert!(!exported.contains("ownership"));
+  }
 }

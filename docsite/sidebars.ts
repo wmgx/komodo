@@ -19,6 +19,7 @@ const sidebars: SidebarsConfig = {
       ],
     },
     "resources",
+    "domains/index",
     {
       type: "category",
       label: "Deploy",

@@ -133,7 +133,7 @@ function onUpdate(
           id={update.target.id}
         />
       ) : (
-        <Text>System</Text>
+        <Text>{update.target.type}</Text>
       ),
       color,
     });
@@ -152,6 +152,13 @@ function onUpdate(
   // Invalidate these every time
   invalidate(["ListUpdates"]);
   invalidate(["GetUpdate", { id: update.id }]);
+  if (update.target.type === "Domain") {
+    invalidate(["ListDomains"], ["GetDomain"], ["GetDomainStatus"]);
+  } else if (update.target.type === "DnsProvider") {
+    invalidate(["ListDnsProviders"], ["GetDnsProvider"]);
+  } else if (update.target.type === "Ingress") {
+    invalidate(["ListIngresses"], ["GetIngress"]);
+  }
   if (update.target.type === "Swarm") {
     invalidate(["GetSwarmActionState", { swarm: update.target.id }]);
   } else if (update.target.type === "Server") {

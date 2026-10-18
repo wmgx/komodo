@@ -42,6 +42,7 @@ mod action;
 mod alerter;
 mod build;
 mod deployment;
+mod domain;
 mod maintenance;
 mod procedure;
 mod repo;
@@ -70,6 +71,11 @@ pub struct ExecuteArgs {
 #[error(mogh_error::Error)]
 #[serde(tag = "type", content = "params")]
 pub enum ExecuteRequest {
+  ReconcileDomain(ReconcileDomain),
+  RemoveDomain(RemoveDomain),
+  MigrateDomain(MigrateDomain),
+  FinalizeDomainMigration(FinalizeDomainMigration),
+
   // ==== STACK ====
   DeployStack(DeployStack),
   BatchDeployStack(BatchDeployStack),
@@ -224,6 +230,65 @@ pub fn inner_handler(
   >,
 > {
   Box::pin(async move {
+    match request {
+      ExecuteRequest::ReconcileDomain(r) => {
+        return Ok(ExecutionResult::Single(
+          crate::domain::accept(
+            r.domain,
+            r.plan_id,
+            r.expected_generation,
+            r.request_id,
+            "ReconcileDomain",
+            user,
+          )
+          .await?
+          .into(),
+        ));
+      }
+      ExecuteRequest::RemoveDomain(r) => {
+        return Ok(ExecutionResult::Single(
+          crate::domain::accept(
+            r.domain,
+            r.plan_id,
+            r.expected_generation,
+            r.request_id,
+            "RemoveDomain",
+            user,
+          )
+          .await?
+          .into(),
+        ));
+      }
+      ExecuteRequest::MigrateDomain(r) => {
+        return Ok(ExecutionResult::Single(
+          crate::domain::accept(
+            r.domain,
+            r.plan_id,
+            r.expected_generation,
+            r.request_id,
+            "MigrateDomain",
+            user,
+          )
+          .await?
+          .into(),
+        ));
+      }
+      ExecuteRequest::FinalizeDomainMigration(r) => {
+        return Ok(ExecutionResult::Single(
+          crate::domain::accept(
+            r.domain,
+            r.plan_id,
+            r.expected_generation,
+            r.request_id,
+            "FinalizeDomainMigration",
+            user,
+          )
+          .await?
+          .into(),
+        ));
+      }
+      _ => {}
+    }
     let task_id = Uuid::new_v4();
 
     // Need to validate no cancel is active before any update is created.

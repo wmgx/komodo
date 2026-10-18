@@ -45,6 +45,7 @@ mod build;
 mod builder;
 mod deployment;
 mod docker;
+mod domain;
 mod onboarding_key;
 mod permission;
 mod procedure;
@@ -83,6 +84,19 @@ fn list_limit(limit: Option<u64>) -> u64 {
 #[error(mogh_error::Error)]
 #[serde(tag = "type", content = "params")]
 enum ReadRequest {
+  GetDomain(GetDomain),
+  ListDomains(ListDomains),
+  GetDnsProvider(GetDnsProvider),
+  ListDnsProviders(ListDnsProviders),
+  GetIngress(GetIngress),
+  ListIngresses(ListIngresses),
+  GetDomainStatus(GetDomainStatus),
+  ListDomainAdapters(ListDomainAdapters),
+  GetDomainAdapterCapabilities(GetDomainAdapterCapabilities),
+  PlanDomainChange(PlanDomainChange),
+  GetDomainPlan(GetDomainPlan),
+  ValidateDomainConnection(ValidateDomainConnection),
+
   GetVersion(GetVersion),
   GetCoreInfo(GetCoreInfo),
   ListSecrets(ListSecrets),
@@ -362,6 +376,8 @@ impl Resolve<ReadArgs> for GetCoreInfo {
   ) -> mogh_error::Result<GetCoreInfoResponse> {
     let config = core_config();
     let info = GetCoreInfoResponse {
+      domain_management_enabled: core_config()
+        .domain_management_enabled,
       title: config.title.clone(),
       monitoring_interval: config.monitoring_interval,
       webhook_base_url: if config.webhook_base_url.is_empty() {

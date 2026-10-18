@@ -1,5 +1,5 @@
 use anyhow::Context;
-use database::mungos::mongodb::Collection;
+use database::mungos::mongodb::{Collection, bson::doc};
 use formatting::format_serror;
 use indexmap::IndexSet;
 use komodo_client::{
@@ -363,6 +363,18 @@ impl super::KomodoResource for Stack {
     stack: &Resource<Self::Config, Self::Info>,
     update: &mut Update,
   ) -> anyhow::Result<()> {
+    if db_client().domain_ownership.find_one(doc! { "cleaned": { "$ne": true }, "$or": [
+      { "references": &stack.id },
+      { "config.target.type": "StackService", "config.target.params.stack_id": &stack.id },
+      { "old.config.target.type": "StackService", "old.config.target.params.stack_id": &stack.id }
+    ] }).await?.is_some() {
+      anyhow::bail!("Resource is still owned by a Domain route; complete cleanup or explicit abandon first");
+    }
+
+    if db_client().domains.find_one(doc! { "config.target.type": "StackService", "config.target.params.stack_id": &stack.id }).await?.is_some() {
+      anyhow::bail!("Resource is referenced by a Domain; remove or migrate the binding first");
+    }
+
     // If it is Up, it should be taken down
     let state = get_stack_state(stack)
       .await

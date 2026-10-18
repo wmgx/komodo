@@ -85,9 +85,9 @@ export function AlertDetailsContent({
   }
 
   const RC =
-    alert.target.type === "System"
-      ? null
-      : ResourceComponents[alert.target.type];
+    alert.target.type in ResourceComponents
+      ? ResourceComponents[alert.target.type as UsableResource]
+      : null;
 
   return (
     <Stack gap="xl" m="md">
@@ -103,9 +103,11 @@ export function AlertDetailsContent({
       <Stack gap="sm">
         {/** RESOURCE / VERSION */}
         <Group gap="xs">
-          {RC ? (
+          {RC || alert.target.type !== "System" ? (
             <ResourceLink
-              type={alert.target.type as UsableResource}
+              type={
+                alert.target.type as Exclude<typeof alert.target.type, "System">
+              }
               id={alert.target.id}
               onClick={close}
               fz="md"

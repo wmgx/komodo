@@ -159,6 +159,8 @@ impl Default for &PermissionLevel {
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub enum SpecificPermission {
+  /// Explicit authorization to publish a Deployment or Stack using a Domain.
+  AttachDomain,
   /// On **Server**
   ///   - Access the terminal apis
   /// On **Stack / Deployment**
@@ -252,6 +254,10 @@ impl PermissionLevel {
   /// Operation requires Terminal permission
   pub fn terminal(self) -> PermissionLevelAndSpecifics {
     self.specific(SpecificPermission::Terminal)
+  }
+
+  pub fn attach_domain(self) -> PermissionLevelAndSpecifics {
+    self.specific(SpecificPermission::AttachDomain)
   }
 
   /// Operation requires Attach permission
@@ -381,6 +387,10 @@ impl PermissionLevelAndSpecifics {
   /// Operation requires Terminal permission
   pub fn terminal(self) -> PermissionLevelAndSpecifics {
     self.specific(SpecificPermission::Terminal)
+  }
+
+  pub fn attach_domain(self) -> PermissionLevelAndSpecifics {
+    self.specific(SpecificPermission::AttachDomain)
   }
 
   /// Operation requires Attach permission

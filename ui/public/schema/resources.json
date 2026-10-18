@@ -4,81 +4,99 @@
   "description": "Specifies resources to sync on Komodo",
   "type": "object",
   "properties": {
+    "domain": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/ResourceToml"
+      }
+    },
+    "dns_provider": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/ResourceToml2"
+      }
+    },
+    "ingress": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/ResourceToml3"
+      }
+    },
     "swarm": {
       "description": "Declare a swarm",
       "type": "array",
       "items": {
-        "$ref": "#/definitions/ResourceToml"
+        "$ref": "#/definitions/ResourceToml4"
       }
     },
     "server": {
       "description": "Declare a server",
       "type": "array",
       "items": {
-        "$ref": "#/definitions/ResourceToml2"
+        "$ref": "#/definitions/ResourceToml5"
       }
     },
     "stack": {
       "description": "Declare a stack",
       "type": "array",
       "items": {
-        "$ref": "#/definitions/ResourceToml3"
+        "$ref": "#/definitions/ResourceToml6"
       }
     },
     "deployment": {
       "description": "Declare a deployment",
       "type": "array",
       "items": {
-        "$ref": "#/definitions/ResourceToml4"
+        "$ref": "#/definitions/ResourceToml7"
       }
     },
     "build": {
       "description": "Declare a build",
       "type": "array",
       "items": {
-        "$ref": "#/definitions/ResourceToml5"
+        "$ref": "#/definitions/ResourceToml8"
       }
     },
     "repo": {
       "description": "Declare a repo",
       "type": "array",
       "items": {
-        "$ref": "#/definitions/ResourceToml6"
+        "$ref": "#/definitions/ResourceToml9"
       }
     },
     "procedure": {
       "description": "Declare a procedure",
       "type": "array",
       "items": {
-        "$ref": "#/definitions/ResourceToml7"
+        "$ref": "#/definitions/ResourceToml10"
       }
     },
     "action": {
       "description": "Declare an action",
       "type": "array",
       "items": {
-        "$ref": "#/definitions/ResourceToml8"
+        "$ref": "#/definitions/ResourceToml11"
       }
     },
     "alerter": {
       "description": "Declare an alerter",
       "type": "array",
       "items": {
-        "$ref": "#/definitions/ResourceToml9"
+        "$ref": "#/definitions/ResourceToml12"
       }
     },
     "builder": {
       "description": "Declare a builder",
       "type": "array",
       "items": {
-        "$ref": "#/definitions/ResourceToml10"
+        "$ref": "#/definitions/ResourceToml13"
       }
     },
     "resource_sync": {
       "description": "Declare a resource sync",
       "type": "array",
       "items": {
-        "$ref": "#/definitions/ResourceToml11"
+        "$ref": "#/definitions/ResourceToml14"
       }
     },
     "user_group": {
@@ -98,6 +116,646 @@
   },
   "definitions": {
     "ResourceToml": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "description": "The resource name. Required",
+          "type": "string"
+        },
+        "description": {
+          "description": "The resource description. Optional.",
+          "type": "string"
+        },
+        "template": {
+          "description": "Mark resource as a template",
+          "type": "boolean"
+        },
+        "tags": {
+          "description": "Tag ids or names. Optional",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "deploy": {
+          "description": "Optional. Only relevant for deployments / stacks.\n\nWill ensure deployment / stack is running with the latest configuration.\nDeploy actions to achieve this will be included in the sync.\nDefault is false.",
+          "type": "boolean"
+        },
+        "after": {
+          "description": "Optional. Only relevant for deployments / stacks using the 'deploy' sync feature.\n\nSpecify other deployments / stacks by name as dependencies.\nThe sync will ensure the deployment / stack will only be deployed 'after' its dependencies.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "config": {
+          "description": "Resource specific configuration.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/PartialDomainConfig"
+            }
+          ]
+        }
+      },
+      "required": [
+        "name"
+      ]
+    },
+    "PartialDomainConfig": {
+      "type": "object",
+      "properties": {
+        "hostname": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "target": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/DomainTarget"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "dns": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/DomainDns"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "ingress": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tls": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/DomainTls"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reconcile_mode": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ReconcileMode"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "DomainTarget": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "Deployment"
+            },
+            "params": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "port": {
+                  "type": "integer",
+                  "format": "uint16",
+                  "minimum": 0,
+                  "maximum": 65535
+                },
+                "scheme": {
+                  "$ref": "#/definitions/TargetScheme"
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "port",
+                "scheme"
+              ]
+            }
+          },
+          "required": [
+            "type",
+            "params"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "StackService"
+            },
+            "params": {
+              "type": "object",
+              "properties": {
+                "stack_id": {
+                  "type": "string"
+                },
+                "service": {
+                  "type": "string"
+                },
+                "port": {
+                  "type": "integer",
+                  "format": "uint16",
+                  "minimum": 0,
+                  "maximum": 65535
+                },
+                "scheme": {
+                  "$ref": "#/definitions/TargetScheme"
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "stack_id",
+                "service",
+                "port",
+                "scheme"
+              ]
+            }
+          },
+          "required": [
+            "type",
+            "params"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "Url"
+            },
+            "params": {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "url"
+              ]
+            }
+          },
+          "required": [
+            "type",
+            "params"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "TargetScheme": {
+      "type": "string",
+      "enum": [
+        "Http",
+        "Https"
+      ]
+    },
+    "DomainDns": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "External"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "Managed"
+            },
+            "params": {
+              "type": "object",
+              "properties": {
+                "provider": {
+                  "type": "string"
+                },
+                "ttl": {
+                  "type": "integer",
+                  "format": "uint32",
+                  "minimum": 0
+                },
+                "proxy_mode": {
+                  "$ref": "#/definitions/ProxyMode"
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "provider",
+                "ttl",
+                "proxy_mode"
+              ]
+            }
+          },
+          "required": [
+            "type",
+            "params"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "ProxyMode": {
+      "type": "string",
+      "enum": [
+        "DnsOnly",
+        "Proxied"
+      ]
+    },
+    "DomainTls": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "$ref": "#/definitions/TlsMode"
+        },
+        "profile": {
+          "type": "string",
+          "default": ""
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "mode"
+      ]
+    },
+    "TlsMode": {
+      "type": "string",
+      "enum": [
+        "RequireHttps",
+        "HttpOnly"
+      ]
+    },
+    "ReconcileMode": {
+      "type": "string",
+      "enum": [
+        "Manual",
+        "Automatic"
+      ]
+    },
+    "ResourceToml2": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "description": "The resource name. Required",
+          "type": "string"
+        },
+        "description": {
+          "description": "The resource description. Optional.",
+          "type": "string"
+        },
+        "template": {
+          "description": "Mark resource as a template",
+          "type": "boolean"
+        },
+        "tags": {
+          "description": "Tag ids or names. Optional",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "deploy": {
+          "description": "Optional. Only relevant for deployments / stacks.\n\nWill ensure deployment / stack is running with the latest configuration.\nDeploy actions to achieve this will be included in the sync.\nDefault is false.",
+          "type": "boolean"
+        },
+        "after": {
+          "description": "Optional. Only relevant for deployments / stacks using the 'deploy' sync feature.\n\nSpecify other deployments / stacks by name as dependencies.\nThe sync will ensure the deployment / stack will only be deployed 'after' its dependencies.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "config": {
+          "description": "Resource specific configuration.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/PartialDnsProviderConfig"
+            }
+          ]
+        }
+      },
+      "required": [
+        "name"
+      ]
+    },
+    "PartialDnsProviderConfig": {
+      "type": "object",
+      "properties": {
+        "adapter": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "schema_version": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0
+        },
+        "account_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "zone_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "secret": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/SecretRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "allowed_hostname_suffixes": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "SecretRef": {
+      "type": "object",
+      "properties": {
+        "source": {
+          "$ref": "#/definitions/SecretSource"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "source",
+        "name"
+      ]
+    },
+    "SecretSource": {
+      "type": "string",
+      "enum": [
+        "CoreSecret"
+      ]
+    },
+    "ResourceToml3": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "description": "The resource name. Required",
+          "type": "string"
+        },
+        "description": {
+          "description": "The resource description. Optional.",
+          "type": "string"
+        },
+        "template": {
+          "description": "Mark resource as a template",
+          "type": "boolean"
+        },
+        "tags": {
+          "description": "Tag ids or names. Optional",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "deploy": {
+          "description": "Optional. Only relevant for deployments / stacks.\n\nWill ensure deployment / stack is running with the latest configuration.\nDeploy actions to achieve this will be included in the sync.\nDefault is false.",
+          "type": "boolean"
+        },
+        "after": {
+          "description": "Optional. Only relevant for deployments / stacks using the 'deploy' sync feature.\n\nSpecify other deployments / stacks by name as dependencies.\nThe sync will ensure the deployment / stack will only be deployed 'after' its dependencies.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "config": {
+          "description": "Resource specific configuration.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/PartialIngressConfig"
+            }
+          ]
+        }
+      },
+      "required": [
+        "name"
+      ]
+    },
+    "PartialIngressConfig": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0
+        },
+        "adapter": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/IngressAdapterConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "allowed_hostname_suffixes": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "allowed_networks": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "docker_network": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tls_profiles": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/definitions/TlsProfile"
+          }
+        },
+        "drain_seconds": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0
+        }
+      }
+    },
+    "IngressAdapterConfig": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "TraefikFileV1"
+            },
+            "params": {
+              "type": "object",
+              "properties": {
+                "server": {
+                  "type": "string"
+                },
+                "entrypoint": {
+                  "type": "string"
+                },
+                "dns_target": {
+                  "type": "string"
+                },
+                "dedicated": {
+                  "type": "boolean"
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "server",
+                "entrypoint",
+                "dns_target",
+                "dedicated"
+              ]
+            }
+          },
+          "required": [
+            "type",
+            "params"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "CloudflareTunnelV1"
+            },
+            "params": {
+              "type": "object",
+              "properties": {
+                "account_id": {
+                  "type": "string"
+                },
+                "tunnel_id": {
+                  "type": "string"
+                },
+                "secret": {
+                  "$ref": "#/definitions/SecretRef"
+                },
+                "dedicated": {
+                  "type": "boolean"
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "account_id",
+                "tunnel_id",
+                "secret",
+                "dedicated"
+              ]
+            }
+          },
+          "required": [
+            "type",
+            "params"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "TlsProfile": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "mode": {
+          "$ref": "#/definitions/TlsMode"
+        },
+        "certificate_resolver": {
+          "type": "string",
+          "default": ""
+        },
+        "requires_dns": {
+          "type": "boolean",
+          "default": false
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "mode"
+      ]
+    },
+    "ResourceToml4": {
       "type": "object",
       "properties": {
         "name": {
@@ -275,7 +933,7 @@
         }
       ]
     },
-    "ResourceToml2": {
+    "ResourceToml5": {
       "type": "object",
       "properties": {
         "name": {
@@ -502,7 +1160,7 @@
         }
       }
     },
-    "ResourceToml3": {
+    "ResourceToml6": {
       "type": "object",
       "properties": {
         "name": {
@@ -964,7 +1622,7 @@
         }
       }
     },
-    "ResourceToml4": {
+    "ResourceToml7": {
       "type": "object",
       "properties": {
         "name": {
@@ -1022,6 +1680,13 @@
         },
         "server": {
           "description": "The Server to deploy the Deployment on, setting the Deployment into Container mode.\n\nNote. If both swarm_id and server_id are set,\nswarm_id overrides server_id and the Deployment will be in Swarm mode.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "custom_name": {
+          "description": "Specify a custom container / service name,\nif different from Deployment name.",
           "type": [
             "string",
             "null"
@@ -1294,7 +1959,7 @@
         "SIGTERM"
       ]
     },
-    "ResourceToml5": {
+    "ResourceToml8": {
       "type": "object",
       "properties": {
         "name": {
@@ -1596,7 +2261,7 @@
         }
       }
     },
-    "ResourceToml6": {
+    "ResourceToml9": {
       "type": "object",
       "properties": {
         "name": {
@@ -1777,7 +2442,7 @@
         }
       }
     },
-    "ResourceToml7": {
+    "ResourceToml10": {
       "type": "object",
       "properties": {
         "name": {
@@ -1949,6 +2614,70 @@
     "Execution": {
       "description": "A wrapper for all Komodo exections.",
       "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "ReconcileDomain"
+            },
+            "params": {
+              "$ref": "#/definitions/ReconcileDomain"
+            }
+          },
+          "required": [
+            "type",
+            "params"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "RemoveDomain"
+            },
+            "params": {
+              "$ref": "#/definitions/RemoveDomain"
+            }
+          },
+          "required": [
+            "type",
+            "params"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "MigrateDomain"
+            },
+            "params": {
+              "$ref": "#/definitions/MigrateDomain"
+            }
+          },
+          "required": [
+            "type",
+            "params"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "FinalizeDomainMigration"
+            },
+            "params": {
+              "$ref": "#/definitions/FinalizeDomainMigration"
+            }
+          },
+          "required": [
+            "type",
+            "params"
+          ]
+        },
         {
           "description": "The \"null\" execution. Does nothing.",
           "type": "object",
@@ -3272,6 +4001,102 @@
         }
       ]
     },
+    "ReconcileDomain": {
+      "type": "object",
+      "properties": {
+        "domain": {
+          "type": "string"
+        },
+        "plan_id": {
+          "type": "string"
+        },
+        "expected_generation": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "request_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "domain",
+        "plan_id",
+        "expected_generation",
+        "request_id"
+      ]
+    },
+    "RemoveDomain": {
+      "type": "object",
+      "properties": {
+        "domain": {
+          "type": "string"
+        },
+        "plan_id": {
+          "type": "string"
+        },
+        "expected_generation": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "request_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "domain",
+        "plan_id",
+        "expected_generation",
+        "request_id"
+      ]
+    },
+    "MigrateDomain": {
+      "type": "object",
+      "properties": {
+        "domain": {
+          "type": "string"
+        },
+        "plan_id": {
+          "type": "string"
+        },
+        "expected_generation": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "request_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "domain",
+        "plan_id",
+        "expected_generation",
+        "request_id"
+      ]
+    },
+    "FinalizeDomainMigration": {
+      "type": "object",
+      "properties": {
+        "domain": {
+          "type": "string"
+        },
+        "plan_id": {
+          "type": "string"
+        },
+        "expected_generation": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "request_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "domain",
+        "plan_id",
+        "expected_generation",
+        "request_id"
+      ]
+    },
     "NoData": {
       "description": "Represents an empty json object: `{}`",
       "type": "object"
@@ -3312,6 +4137,14 @@
         "pattern": {
           "description": "Id or name or wildcard pattern or regex.\nSupports multiline and comma delineated combinations of the above.\n\nExample:\n```text\n# match all foo-* stacks\nfoo-*\n# add some more\nextra-stack-1, extra-stack-2\n```",
           "type": "string"
+        },
+        "tags": {
+          "description": "Filter matches by tag.\nIf empty, skips tag filtering.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
         }
       },
       "required": [
@@ -3346,6 +4179,14 @@
         "pattern": {
           "description": "Id or name or wildcard pattern or regex.\nSupports multiline and comma delineated combinations of the above.\n\nExample:\n```text\n# match all foo-* stacks\nfoo-*\n# add some more\nextra-stack-1, extra-stack-2\n```",
           "type": "string"
+        },
+        "tags": {
+          "description": "Filter matches by tag.\nIf empty, skips tag filtering.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
         }
       },
       "required": [
@@ -3380,6 +4221,14 @@
         "pattern": {
           "description": "Id or name or wildcard pattern or regex.\nSupports multiline and comma delineated combinations of the above.\n\nExample:\n```text\n# match all foo-* stacks\nfoo-*\n# add some more\nextra-stack-1, extra-stack-2\n```",
           "type": "string"
+        },
+        "tags": {
+          "description": "Filter matches by tag.\nIf empty, skips tag filtering.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
         }
       },
       "required": [
@@ -3540,6 +4389,14 @@
         "pattern": {
           "description": "Id or name or wildcard pattern or regex.\nSupports multiline and comma delineated combinations of the above.\n\nExample:\n```text\n# match all foo-* stacks\nfoo-*\n# add some more\nextra-stack-1, extra-stack-2\n```",
           "type": "string"
+        },
+        "tags": {
+          "description": "Filter matches by tag.\nIf empty, skips tag filtering.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
         }
       },
       "required": [
@@ -3679,6 +4536,14 @@
         "pattern": {
           "description": "Id or name or wildcard pattern or regex.\nSupports multiline and comma delineated combinations of the above.\n\nExample:\n```text\n# match all foo-* deployments\nfoo-*\n# add some more\nextra-deployment-1, extra-deployment-2\n```",
           "type": "string"
+        },
+        "tags": {
+          "description": "Filter matches by tag.\nIf empty, skips tag filtering.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
         }
       },
       "required": [
@@ -3821,6 +4686,14 @@
         "pattern": {
           "description": "Id or name or wildcard pattern or regex.\nSupports multiline and comma delineated combinations of the above.\n\nExample:\n```text\n# match all foo-* deployments\nfoo-*\n# add some more\nextra-deployment-1, extra-deployment-2\n```",
           "type": "string"
+        },
+        "tags": {
+          "description": "Filter matches by tag.\nIf empty, skips tag filtering.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
         }
       },
       "required": [
@@ -3847,6 +4720,14 @@
         "pattern": {
           "description": "Id or name or wildcard pattern or regex.\nSupports multiline and comma delineated combinations of the above.\n\nExample:\n```text\n# match all foo-* builds\nfoo-*\n# add some more\nextra-build-1, extra-build-2\n```",
           "type": "string"
+        },
+        "tags": {
+          "description": "Filter matches by tag.\nIf empty, skips tag filtering.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
         }
       },
       "required": [
@@ -3886,6 +4767,14 @@
         "pattern": {
           "description": "Id or name or wildcard pattern or regex.\nSupports multiline and comma delineated combinations of the above.\n\nExample:\n```text\n# match all foo-* repos\nfoo-*\n# add some more\nextra-repo-1, extra-repo-2\n```",
           "type": "string"
+        },
+        "tags": {
+          "description": "Filter matches by tag.\nIf empty, skips tag filtering.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
         }
       },
       "required": [
@@ -3912,6 +4801,14 @@
         "pattern": {
           "description": "Id or name or wildcard pattern or regex.\nSupports multiline and comma delineated combinations of the above.\n\nExample:\n```text\n# match all foo-* repos\nfoo-*\n# add some more\nextra-repo-1, extra-repo-2\n```",
           "type": "string"
+        },
+        "tags": {
+          "description": "Filter matches by tag.\nIf empty, skips tag filtering.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
         }
       },
       "required": [
@@ -3938,6 +4835,14 @@
         "pattern": {
           "description": "Id or name or wildcard pattern or regex.\nSupports multiline and comma delineated combinations of the above.\n\nExample:\n```text\n# match all foo-* repos\nfoo-*\n# add some more\nextra-repo-1, extra-repo-2\n```",
           "type": "string"
+        },
+        "tags": {
+          "description": "Filter matches by tag.\nIf empty, skips tag filtering.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
         }
       },
       "required": [
@@ -3977,6 +4882,14 @@
         "pattern": {
           "description": "Id or name or wildcard pattern or regex.\nSupports multiline and comma delineated combinations of the above.\n\nExample:\n```text\n# match all foo-* procedures\nfoo-*\n# add some more\nextra-procedure-1, extra-procedure-2\n```",
           "type": "string"
+        },
+        "tags": {
+          "description": "Filter matches by tag.\nIf empty, skips tag filtering.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
         }
       },
       "required": [
@@ -4031,6 +4944,14 @@
         "pattern": {
           "description": "Id or name or wildcard pattern or regex.\nSupports multiline and comma delineated combinations of the above.\n\nExample:\n```text\n# match all foo-* actions\nfoo-*\n# add some more\nextra-action-1, extra-action-2\n```",
           "type": "string"
+        },
+        "tags": {
+          "description": "Filter matches by tag.\nIf empty, skips tag filtering.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
         }
       },
       "required": [
@@ -4095,6 +5016,9 @@
       "description": "Auto-generated discriminant enum variants",
       "type": "string",
       "enum": [
+        "Domain",
+        "DnsProvider",
+        "Ingress",
         "System",
         "Swarm",
         "Server",
@@ -4919,7 +5843,7 @@
         "Cron"
       ]
     },
-    "ResourceToml8": {
+    "ResourceToml11": {
       "type": "object",
       "properties": {
         "name": {
@@ -5078,7 +6002,7 @@
         "json"
       ]
     },
-    "ResourceToml9": {
+    "ResourceToml12": {
       "type": "object",
       "properties": {
         "name": {
@@ -5461,6 +6385,54 @@
           "properties": {
             "type": {
               "type": "string",
+              "const": "Domain"
+            },
+            "id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "DnsProvider"
+            },
+            "id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "Ingress"
+            },
+            "id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
               "const": "System"
             },
             "id": {
@@ -5650,7 +6622,7 @@
         }
       ]
     },
-    "ResourceToml10": {
+    "ResourceToml13": {
       "type": "object",
       "properties": {
         "name": {
@@ -6004,7 +6976,7 @@
         "accounts"
       ]
     },
-    "ResourceToml11": {
+    "ResourceToml14": {
       "type": "object",
       "properties": {
         "name": {
@@ -6233,6 +7205,15 @@
             "Deployment": {
               "$ref": "#/definitions/PermissionLevelAndSpecifics"
             },
+            "DnsProvider": {
+              "$ref": "#/definitions/PermissionLevelAndSpecifics"
+            },
+            "Domain": {
+              "$ref": "#/definitions/PermissionLevelAndSpecifics"
+            },
+            "Ingress": {
+              "$ref": "#/definitions/PermissionLevelAndSpecifics"
+            },
             "Procedure": {
               "$ref": "#/definitions/PermissionLevelAndSpecifics"
             },
@@ -6318,6 +7299,11 @@
     "SpecificPermission": {
       "description": "The specific types of permission that a User or UserGroup can have on a resource.",
       "oneOf": [
+        {
+          "description": "Explicit authorization to publish a Deployment or Stack using a Domain.",
+          "type": "string",
+          "const": "AttachDomain"
+        },
         {
           "description": "On **Server**\n  - Access the terminal apis\nOn **Stack / Deployment**\n  - Access the container exec Apis",
           "type": "string",

@@ -333,6 +333,27 @@ async fn extract_resource_target_with_validation(
   resource_target: &ResourceTarget,
 ) -> mogh_error::Result<(ResourceTargetVariant, String)> {
   match resource_target {
+    ResourceTarget::Domain(ident) => {
+      let resource = crate::resource::get::<
+        komodo_client::entities::domain::Domain,
+      >(ident)
+      .await?;
+      Ok((ResourceTargetVariant::Domain, resource.id))
+    }
+    ResourceTarget::DnsProvider(ident) => {
+      let resource = crate::resource::get::<
+        komodo_client::entities::domain::DnsProvider,
+      >(ident)
+      .await?;
+      Ok((ResourceTargetVariant::DnsProvider, resource.id))
+    }
+    ResourceTarget::Ingress(ident) => {
+      let resource = crate::resource::get::<
+        komodo_client::entities::domain::Ingress,
+      >(ident)
+      .await?;
+      Ok((ResourceTargetVariant::Ingress, resource.id))
+    }
     ResourceTarget::System(_) => {
       let res = resource_target.extract_variant_id();
       Ok((res.0, res.1.clone()))

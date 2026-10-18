@@ -20,6 +20,7 @@ use komodo_client::{
     build::Build,
     builder::Builder,
     deployment::Deployment,
+    domain::{DnsProvider, Domain, Ingress},
     komodo_timestamp,
     permission::PermissionLevel,
     procedure::Procedure,
@@ -772,7 +773,7 @@ impl Resolve<WriteArgs> for RefreshResourceSyncPending {
             .map(|stack| (stack.name.clone(), stack.clone()))
             .collect::<HashMap<_, _>>();
 
-          let deploy_updates =
+          let mut deploy_updates =
             crate::sync::deploy::get_updates_for_view(
               SyncDeployParams {
                 deployments: &resources.deployments,
@@ -782,6 +783,15 @@ impl Resolve<WriteArgs> for RefreshResourceSyncPending {
               },
             )
             .await;
+
+          for item in resources.domains.iter().filter(|item| item.deploy) {
+            let id = all_resources.domains.values().find(|domain| domain.name == item.name).map(|domain| domain.id.clone()).unwrap_or_else(|| item.name.clone());
+            deploy_updates.0.push(komodo_client::entities::sync::SyncDeployTarget {
+              target: ResourceTarget::Domain(id),
+              reason: "Reconcile through a server-validated domain plan after target deployments".into(),
+              after: Vec::new(),
+            });
+          }
 
           let mut diffs = Vec::new();
 
@@ -803,6 +813,7 @@ impl Resolve<WriteArgs> for RefreshResourceSyncPending {
           }
           // New resource types need to be added here manually.
           push_updates!(
+            (Domain, domains),
             (Server, servers),
             (Swarm, swarms),
             (Stack, stacks),
@@ -815,6 +826,9 @@ impl Resolve<WriteArgs> for RefreshResourceSyncPending {
             (Alerter, alerters),
             (ResourceSync, resource_syncs),
           );
+
+          push_updates_for_view::<DnsProvider>(resources.dns_providers, false, None, None, &id_to_tags, &sync.config.match_tags, &mut diffs).await?;
+          push_updates_for_view::<Ingress>(resources.ingresses, false, None, None, &id_to_tags, &sync.config.match_tags, &mut diffs).await?;
 
           (diffs, deploy_updates)
         } else {
