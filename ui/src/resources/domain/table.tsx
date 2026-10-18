@@ -1,10 +1,10 @@
 import { useResourceSelectionState } from "@/lib/hooks";
-import { DataTable, SortableHeader, StatusBadge } from "mogh_ui";
+import { DataTable, SortableHeader } from "mogh_ui";
 import { BoxProps, Text } from "@mantine/core";
 import { Types } from "komodo_client";
 import ResourceLink from "@/resources/link";
 import TableTags from "@/components/tags/table";
-import { domainStatusIntention } from "@/lib/color";
+import ServiceCell, { StatusCell } from "./service-cell";
 
 const SORT_KEYS = ["Name"];
 
@@ -52,6 +52,15 @@ export default function DomainTable({
           accessorKey: "info.hostname",
         },
         {
+          header: "Service",
+          cell: ({ row }) => (
+            <ServiceCell
+              target={row.original.info.target}
+              service={row.original.info.service}
+            />
+          ),
+        },
+        {
           header: "DNS",
           cell: ({ row }) =>
             row.original.info.dns_account || <Text c="dimmed">-</Text>,
@@ -64,10 +73,7 @@ export default function DomainTable({
         {
           header: "Status",
           cell: ({ row }) => (
-            <StatusBadge
-              text={row.original.info.status_code}
-              intent={domainStatusIntention(row.original.info.status_code)}
-            />
+            <StatusCell item={row.original} />
           ),
         },
         {

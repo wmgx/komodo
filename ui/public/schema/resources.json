@@ -5875,6 +5875,34 @@
             "null"
           ]
         },
+        "target": {
+          "description": "The Deployment / Stack this hostname serves. Optional: a Domain\nwithout a target is a free-form DNS / tunnel declaration.\nAlso picks the tunnel bound to the Server it runs on.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ResourceTarget"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "service": {
+          "description": "Service name inside the target Stack. Empty for Deployments.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "port": {
+          "description": "Published port of the target service. 0 = unknown.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint16",
+          "minimum": 0,
+          "maximum": 65535
+        },
         "dns": {
           "description": "DNS record settings. Leave `account` empty to not manage DNS.",
           "anyOf": [
@@ -5967,7 +5995,7 @@
           "default": ""
         },
         "tunnel": {
-          "description": "Name of a tunnel registered on the account.\nIf empty, picked automatically from the Server `target` runs on.",
+          "description": "Name of a tunnel registered on the account.\nIf empty, picked automatically from the Server the Domain `target` runs on.",
           "type": "string",
           "default": ""
         },
@@ -5975,17 +6003,6 @@
           "description": "Origin service, eg. `http://localhost:8080`.",
           "type": "string",
           "default": ""
-        },
-        "target": {
-          "description": "Optional Deployment / Stack. Used to pick the tunnel bound to\nthe Server it runs on when `tunnel` is empty.",
-          "anyOf": [
-            {
-              "$ref": "#/definitions/ResourceTarget"
-            },
-            {
-              "type": "null"
-            }
-          ]
         }
       }
     },

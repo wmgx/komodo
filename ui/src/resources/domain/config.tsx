@@ -144,7 +144,6 @@ function IngressFields({
   if (ingress.tunnel && !tunnels.includes(ingress.tunnel)) {
     tunnels.push(ingress.tunnel);
   }
-  const targetType = ingress.target?.type;
 
   return (
     <Stack>
@@ -157,40 +156,8 @@ function IngressFields({
       {!!ingress.account && (
         <>
           <ConfigItem
-            label="Target"
-            description="Optional Deployment / Stack. Used to pick the tunnel bound to the Server it runs on."
-          >
-            <Select
-              value={targetType ?? null}
-              onChange={(type) =>
-                set({
-                  ...ingress,
-                  target: type
-                    ? ({ type, id: "" } as Types.ResourceTarget)
-                    : undefined,
-                })
-              }
-              data={["Deployment", "Stack"]}
-              placeholder="None"
-              disabled={disabled}
-              clearable
-              w={{ base: "85%", lg: 200 }}
-            />
-            {(targetType === "Deployment" || targetType === "Stack") && (
-              <ResourceSelector
-                type={targetType}
-                selected={ingress.target?.id}
-                onSelect={(id) =>
-                  set({ ...ingress, target: { type: targetType, id } })
-                }
-                disabled={disabled}
-                clearable={false}
-              />
-            )}
-          </ConfigItem>
-          <ConfigItem
             label="Tunnel"
-            description="Tunnel registered on the account. Leave empty to pick automatically from the target's Server."
+            description="Tunnel registered on the account. Leave empty to pick automatically from the bound service's Server."
           >
             <Select
               value={ingress.tunnel || null}
@@ -211,6 +178,67 @@ function IngressFields({
             disabled={disabled}
           />
         </>
+      )}
+    </Stack>
+  );
+}
+
+function ServiceFields({
+  config,
+  setTarget,
+  setUpdate,
+  disabled,
+}: {
+  config: Types.DomainConfig;
+  setTarget: (target: Types.ResourceTarget | undefined) => void;
+  setUpdate: (u: Partial<Types.DomainConfig>) => void;
+  disabled: boolean;
+}) {
+  const type = config.target?.type;
+  const stack = type === "Stack";
+  return (
+    <Stack>
+      <ConfigItem label="Target">
+        <Select
+          value={type ?? null}
+          onChange={(t) =>
+            setTarget(t ? ({ type: t, id: "" } as Types.ResourceTarget) : undefined)
+          }
+          data={["Deployment", "Stack"]}
+          placeholder="None"
+          disabled={disabled}
+          clearable
+          w={{ base: "85%", lg: 200 }}
+        />
+        {(type === "Deployment" || type === "Stack") && (
+          <ResourceSelector
+            type={type}
+            selected={config.target?.id}
+            onSelect={(id) => setTarget({ type, id })}
+            disabled={disabled}
+            clearable={false}
+          />
+        )}
+      </ConfigItem>
+      {stack && (
+        <ConfigInput
+          label="Service"
+          description="Compose service name."
+          value={config.service}
+          onValueChange={(service) => setUpdate({ service })}
+          disabled={disabled}
+        />
+      )}
+      {!!type && (
+        <ConfigInput
+          label="Port"
+          description="Published port of the service (used for the link in DNS mode)."
+          value={config.port}
+          onValueChange={(v) =>
+            setUpdate({ port: Math.min(65535, Math.max(0, parseInt(v) || 0)) })
+          }
+          disabled={disabled}
+        />
       )}
     </Stack>
   );
@@ -252,7 +280,22 @@ export default function DomainConfig({ id }: { id: string }) {
             },
           },
           {
-            label: "DNS",
+            label: "Service",
+            description:
+              "The Deployment / Stack this hostname serves. Prefer Add domain on the service page.",
+            fields: {
+              target: (_target, set) => (
+                <ServiceFields
+                  config={{ ...config, ...update }}
+                  setTarget={(target) => set({ target })}
+                  setUpdate={(u) => setUpdate({ ...update, ...u })}
+                  disabled={disabled}
+                />
+              ),
+            },
+          },
+          {
+            label: "Advanced: DNS record",
             description: "One DNS record for the hostname.",
             fields: {
               dns: (dns, set) => (
@@ -265,7 +308,7 @@ export default function DomainConfig({ id }: { id: string }) {
             },
           },
           {
-            label: "Ingress",
+            label: "Advanced: Tunnel rule",
             description: "One tunnel ingress rule for the hostname.",
             fields: {
               ingress: (ingress, set) => (

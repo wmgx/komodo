@@ -56,6 +56,22 @@ pub type ListDomainsResponse = Vec<DomainListItem>;
 
 //
 
+/// List the domains bound to a Deployment / Stack (optionally one Stack
+/// service). Response: [ListServiceDomainsResponse].
+#[typeshare]
+#[derive(Serialize, Deserialize, Debug, Clone, Resolve)]
+#[empty_traits(KomodoReadRequest)]
+#[response(ListServiceDomainsResponse)]
+#[error(mogh_error::Error)]
+pub struct ListServiceDomains {
+  pub target: crate::entities::ResourceTarget,
+}
+
+#[typeshare]
+pub type ListServiceDomainsResponse = Vec<DomainListItem>;
+
+//
+
 /// List full domains matching optional query. Response: [ListFullDomainsResponse].
 #[typeshare]
 #[derive(Serialize, Deserialize, Debug, Clone, Default, Resolve)]

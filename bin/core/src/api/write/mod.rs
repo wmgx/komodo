@@ -166,6 +166,7 @@ pub enum WriteRequest {
   // ==== DOMAIN ====
   CreateDomain(CreateDomain),
   CopyDomain(CopyDomain),
+  AddServiceDomain(AddServiceDomain),
   DeleteDomain(DeleteDomain),
   UpdateDomain(UpdateDomain),
   RenameDomain(RenameDomain),

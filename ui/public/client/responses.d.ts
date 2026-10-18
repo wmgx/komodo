@@ -118,6 +118,7 @@ export type ReadResponses = {
     GetDomain: Types.GetDomainResponse;
     ListDomains: Types.ListDomainsResponse;
     ListFullDomains: Types.ListFullDomainsResponse;
+    ListServiceDomains: Types.ListServiceDomainsResponse;
     GetDomainPlan: Types.GetDomainPlanResponse;
     ListDomainProviderKinds: Types.ListDomainProviderKindsResponse;
     ListDomainAccounts: Types.ListDomainAccountsResponse;
@@ -228,6 +229,7 @@ export type WriteResponses = {
     RenameAlerter: Types.Update;
     CreateDomain: Types.Domain;
     CopyDomain: Types.Domain;
+    AddServiceDomain: Types.AddServiceDomainResponse;
     DeleteDomain: Types.Domain;
     UpdateDomain: Types.Domain;
     RenameDomain: Types.Update;

@@ -22,8 +22,9 @@
 ```text
 DomainConfig {
   hostname,                       // 小写保存
+  target?, service, port,         // 绑定的 Deployment|Stack、Stack 的 service 名、发布端口（0=未知）
   dns:     { account, record_type(A|AAAA|CNAME, 默认 CNAME), content, ttl, proxied? },
-  ingress: { account, tunnel, service, target? },   // target: Deployment | Stack
+  ingress: { account, tunnel, service },
   on_delete: Cleanup | Retain     // 默认 Cleanup
 }
 ```
@@ -31,7 +32,7 @@ DomainConfig {
 - `dns.account` 为空 = 不管理 DNS；`ingress.account` 为空 = 不走隧道（只管 DNS）。
 - `dns.content` 为空时取隧道目标（`<tunnel-id>.cfargotunnel.com`），`proxied` 未设置时由厂商决定（指向隧道时为 proxied）。
 - **zone 不写在 Domain 上**：按 hostname 对账号可见的 zone 做最长后缀匹配（账号 `params.zones` 可作白名单）。
-- **隧道不写 tunnel_id**：`ingress.tunnel` 填账号里登记的隧道名；为空时按 `target`（Deployment/Stack）所在 Server 自动选账号中绑定了该 Server 的隧道；未设 target 且账号只有一条隧道时用该隧道。多条匹配报 `TunnelAmbiguous`。
+- **隧道不写 tunnel_id**：`ingress.tunnel` 填账号里登记的隧道名；为空时按顶层 `target`（Deployment/Stack）所在 Server 自动选账号中绑定了该 Server 的隧道；未设 target 且账号只有一条隧道时用该隧道。多条匹配报 `TunnelAmbiguous`。
 - `service` 形如 `http://host:port`。
 
 `DomainInfo`（系统维护，ResourceSync 不比较）：`status`（Ready / Drifted{reasons} / Error{reason}，None=未检查）、`observed_at`、`owned: Vec<OwnedObject>`（Komodo 创建并认领的远端对象：layer、account、key、remote_id、scope、applied_digest）。
@@ -85,14 +86,34 @@ DomainConfig {
 
 | 类别 | 请求 |
 |---|---|
-| Read | `GetDomain` `ListDomains`（含 status_code）`ListFullDomains` `GetDomainPlan{domain}` `ListDomainProviderKinds` `ListDomainAccounts` `GetDomainAccount` `DiscoverDomainAccount{account?\|(kind,token)?}`（仅管理员，只读，返回 `{zones, ingresses[{id,name,account_id?,status?}], warnings}`；token 不进日志/响应） |
-| Write | `CreateDomain` `CopyDomain` `UpdateDomain` `RenameDomain` `DeleteDomain` `CreateDomainAccount{name,kind,token,params,description}` `UpdateDomainAccount{id,token?,params?,description?}` `DeleteDomainAccount{id}` |
+| Read | `GetDomain` `ListServiceDomains{target}` `ListDomains`（含 status_code）`ListFullDomains` `GetDomainPlan{domain}` `ListDomainProviderKinds` `ListDomainAccounts` `GetDomainAccount` `DiscoverDomainAccount{account?\|(kind,token)?}`（仅管理员，只读，返回 `{zones, ingresses[{id,name,account_id?,status?}], warnings}`；token 不进日志/响应） |
+| Write | `AddServiceDomain{target, service, hostname, port?, mode?, adopt_conflicts}` `CreateDomain` `CopyDomain` `UpdateDomain` `RenameDomain` `DeleteDomain` `CreateDomainAccount{name,kind,token,params,description}` `UpdateDomainAccount{id,token?,params?,description?}` `DeleteDomainAccount{id}` |
 | Execute | `ApplyDomain{domain, plan_id?, adopt_conflicts}`（同时是 Procedure 的 Execution） |
+
+### 6.1 以服务为中心：AddServiceDomain 与自动推导
+
+`AddServiceDomain`（Write，仅管理员）一步完成：校验主机名 -> 解析目标 Server -> 自动推导配置 -> 在临时 Domain 上做 plan（只读）-> 创建 Domain（名称由 hostname 生成，冲突加 `-2` 后缀）-> apply。返回 `{domain?, mode?, conflicts, warnings, error?, reason?}`：
+
+- plan 出现 `Conflict` 且 `adopt_conflicts=false`：不写入远端、不创建 Domain，`conflicts` 返回待确认对象，确认后带 `adopt_conflicts=true` 重试。
+- 校验/推导失败返回 400 和人话提示（如下划线、未开通隧道）；apply 中途失败时 Domain 已创建，`reason` 带原因，状态为 Error，可在 Domain 页重试。
+
+推导规则（`bin/core/src/domain/auto.rs`，厂商无关，只用 `IngressProvider::select` 与账号 zone）：
+
+1. `mode=Auto|Tunnel` 且目标 Server 在某账号里绑定了隧道（`select(None, server)` 成功）：**Tunnel**。隧道规则 `hostname -> http://localhost:<port>`，**默认假定隧道 agent（cloudflared）以 host 网络运行在该 Server 上**；DNS 为 CNAME 到 `<tunnel_id>.cfargotunnel.com` 且 proxied。多条/多账号匹配报错，不猜。
+2. 否则（`Auto|Dns`）：**DNS**，目标取 Server 的 `external_address`，为空则取 `address` 的 host。IP 用 A / AAAA，域名用 CNAME，不 proxied。私网（10/8、172.16/12、192.168/16、100.64/10、链路本地、IPv6 ULA）返回警告「只能在局域网访问」；回环地址报错。DNS 模式没有端口转发，访问地址是 `http://hostname:port`。
+3. 都无法确定（没有隧道也没有地址、Swarm 目标、没有账号覆盖该 zone）：返回可操作提示。一键开通隧道将在下一批实现，目前提示文案只引导「先开通隧道」。
+4. DNS 账号 = 其 zone（`params.zones` 白名单，否则发现结果）覆盖主机名的账号，优先与隧道同账号；只有一个 DNS 账号且 zone 未知时直接用它。多个 DNS 账号时才会联网发现 zone。
+5. 端口：请求未带 `port` 时，Deployment 取 `config.ports` 唯一的宿主端口；Stack 必须由调用方给出（UI 从 `ListStackServices` 的容器端口读取）。
+
+主机名校验在后端统一做（`validate.rs`）：字母、数字、连字符，不允许下划线，不能以连字符开头/结尾，每段 <=63，总长 <=253，错误信息指出是哪一段、怎么改。
+
+UI 的 Add domain 弹窗会在本地复刻「有无隧道 / 是否内网」做提示，真正决策以后端为准。
 
 ## 7. UI 与 CLI
 
 - UI：`ui/src/resources/domain/`（`index` 注册、`config` 配置表单、`plan` Plan 预览与 Apply、`table`）；设置页「Domains」标签管理账号（`ui/src/pages/settings/domain-accounts/`，仅管理员可见）。Plan 需手动点击才会联网；有 Conflict 时必须勾选确认才会带 `adopt_conflicts=true`。
-- CLI：`km list domains`、`km domain plan <d> [--json]`、`km domain apply <d> [--plan-id] [--adopt-conflicts] [-y]`、`km domain status <d> [--json]`、`km execute apply-domain`。不提供账号管理命令（token 不应出现在命令行参数）。
+- 服务页：Stack / Deployment 详情页的「Domains」区块（`ui/src/resources/domain/service-domains.tsx`，经资源的 `Page` 插槽挂载）；删除服务的确认框（`resources/delete.tsx`）会列出绑定域名并可勾选同时删除，不勾选则 Domain 状态显示「目标服务已不存在」（纯 UI 判断）。Domains 列表有 Service 列可跳转。
+- CLI：`km domain add <stack|deployment> <name> <hostname> [--service] [--port] [--mode] [-y]`、`km list domains`、`km domain plan <d> [--json]`、`km domain apply <d> [--plan-id] [--adopt-conflicts] [-y]`、`km domain status <d> [--json]`、`km execute apply-domain`。不提供账号管理命令（token 不应出现在命令行参数）。
 
 ## 8. 已知限制
 

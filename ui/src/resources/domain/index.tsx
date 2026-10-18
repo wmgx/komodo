@@ -10,6 +10,8 @@ import DomainPlan from "./plan";
 import { domainStatusIntention } from "@/lib/color";
 import { hexColorByIntention, StatusBadge } from "mogh_ui";
 import { Group, Text } from "@mantine/core";
+import { useTargetGone } from "./service-cell";
+import { TARGET_GONE, reasonText, statusReasons } from "./text";
 
 export function useDomain(
   id: string | undefined,
@@ -90,19 +92,21 @@ export const DomainComponents: RequiredResourceComponents<
 
   Info: {
     Reason: ({ id }) => {
-      const status = useFullDomain(id)?.info?.status;
-      const reasons =
-        status?.type === "Error"
-          ? [status.data.reason]
-          : status?.type === "Drifted"
-            ? status.data.reasons
-            : [];
+      const full = useFullDomain(id);
+      const gone = useTargetGone(full?.config?.target);
+      const reasons = statusReasons(full?.info?.status);
+      if (gone)
+        return (
+          <Text fz="sm" c="red">
+            {TARGET_GONE}
+          </Text>
+        );
       if (!reasons.length) return null;
       return (
         <Group gap="xs">
           {reasons.map((r, i) => (
             <Text key={i} fz="sm" c="dimmed" title={r.code}>
-              {r.code}: {r.message}
+              {reasonText(r)}
             </Text>
           ))}
         </Group>

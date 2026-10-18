@@ -5,11 +5,13 @@ use komodo_client::{
   api::{
     execute::ApplyDomain,
     read::{GetDomain, GetDomainPlan},
+    write::AddServiceDomain,
   },
   entities::{
+    ResourceTarget,
     config::cli::args::domain::{
-      DomainApplyArgs, DomainCommand, DomainPlanArgs,
-      DomainStatusArgs,
+      DomainAddArgs, DomainAddKind, DomainApplyArgs, DomainCommand,
+      DomainPlanArgs, DomainStatusArgs,
     },
     domain::{ChangeAction, DomainPlan, DomainReason, DomainStatus},
     update::{Update, UpdateStatus},
@@ -23,6 +25,57 @@ pub async fn handle(command: &DomainCommand) -> anyhow::Result<()> {
     DomainCommand::Plan(args) => plan(args).await,
     DomainCommand::Apply(args) => apply(args).await,
     DomainCommand::Status(args) => status(args).await,
+    DomainCommand::Add(args) => add(args).await,
+  }
+}
+
+async fn add(args: &DomainAddArgs) -> anyhow::Result<()> {
+  let client = super::komodo_client().await?;
+  let target = match args.kind {
+    DomainAddKind::Stack => ResourceTarget::Stack(args.name.clone()),
+    DomainAddKind::Deployment => {
+      ResourceTarget::Deployment(args.name.clone())
+    }
+  };
+  let mut adopt = args.yes;
+  loop {
+    let res = client
+      .write(AddServiceDomain {
+        target: target.clone(),
+        service: args.service.clone(),
+        hostname: args.hostname.clone(),
+        port: args.port,
+        mode: args.mode,
+        adopt_conflicts: adopt,
+      })
+      .await
+      .context("Failed to add domain")?;
+    for w in &res.warnings {
+      println!("{}: {w}", "Note".yellow());
+    }
+    if !res.conflicts.is_empty() {
+      println!(
+        "These remote objects exist but are not managed by Komodo and would be overwritten:"
+      );
+      for c in &res.conflicts {
+        println!("  {} {}", c.object.kind, c.object.key);
+      }
+      super::wait_for_enter("overwrite them", false)?;
+      adopt = true;
+      continue;
+    }
+    if let Some(error) = &res.error {
+      bail!("{error}");
+    }
+    if let Some(domain) = res.domain {
+      println!(
+        "{} {} ({:?})",
+        "Added".green(),
+        domain.config.hostname.bold(),
+        res.mode.unwrap_or_default()
+      );
+    }
+    return Ok(());
   }
 }
 

@@ -347,7 +347,12 @@ function onUpdate(
     }
 
     if (update.target.type === "Domain") {
-      invalidate(["ListDomains"], ["ListFullDomains"], ["GetDomain"]);
+      invalidate(
+        ["ListDomains"],
+        ["ListFullDomains"],
+        ["ListServiceDomains"],
+        ["GetDomain"],
+      );
     }
 
     if (

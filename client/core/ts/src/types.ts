@@ -233,18 +233,6 @@ export interface ActionQuerySpecifics {
 
 export type ActionQuery = ResourceQuery<ActionQuerySpecifics>;
 
-export type AlerterEndpoint = 
-	/** Send alert serialized to JSON to an http endpoint. */
-	| { type: "Custom", params: CustomAlerterEndpoint }
-	/** Send alert to a Slack app */
-	| { type: "Slack", params: SlackAlerterEndpoint }
-	/** Send alert to a Discord app */
-	| { type: "Discord", params: DiscordAlerterEndpoint }
-	/** Send alert to Ntfy */
-	| { type: "Ntfy", params: NtfyAlerterEndpoint }
-	/** Send alert to Pushover */
-	| { type: "Pushover", params: PushoverAlerterEndpoint };
-
 /** Used to reference a specific resource across all resource types */
 export type ResourceTarget = 
 	| { type: "System", id: string }
@@ -260,6 +248,232 @@ export type ResourceTarget =
 	| { type: "Alerter", id: string }
 	| { type: "Domain", id: string }
 	| { type: "ResourceSync", id: string };
+
+export enum DnsRecordType {
+	A = "A",
+	AAAA = "AAAA",
+	CNAME = "CNAME",
+}
+
+/** DNS record settings of a Domain. */
+export interface DnsBinding {
+	/** Name of the Domain account which manages DNS. Empty = DNS not managed. */
+	account?: string;
+	/** Default: `CNAME` */
+	record_type?: DnsRecordType;
+	/**
+	 * Record content. If empty, taken from the ingress tunnel
+	 * (eg. `<tunnel-id>.cfargotunnel.com`).
+	 */
+	content?: string;
+	/** TTL seconds. 0 / unset = provider automatic. */
+	ttl?: number;
+	/**
+	 * Whether to proxy through the provider. Unset = provider decides
+	 * (proxied when pointing at a tunnel).
+	 */
+	proxied?: boolean;
+}
+
+/** Tunnel / ingress settings of a Domain. */
+export interface IngressBinding {
+	/**
+	 * Name of the Domain account which owns the tunnel.
+	 * Empty = ingress not managed.
+	 */
+	account?: string;
+	/**
+	 * Name of a tunnel registered on the account.
+	 * If empty, picked automatically from the Server the Domain `target` runs on.
+	 */
+	tunnel?: string;
+	/** Origin service, eg. `http://localhost:8080`. */
+	service?: string;
+}
+
+export enum OnDelete {
+	/** Remove remote objects created by Komodo. Delete is refused if cleanup fails. */
+	Cleanup = "Cleanup",
+	/** Leave remote objects untouched. */
+	Retain = "Retain",
+}
+
+/**
+ * Declares how a public hostname reaches a service:
+ * one DNS record and / or one tunnel ingress rule.
+ * 
+ * DNS zone is auto-detected from the account (longest suffix match).
+ */
+export interface DomainConfig {
+	/** The full hostname, eg. `app.example.com`. Lowercased on save. */
+	hostname?: string;
+	/**
+	 * The Deployment / Stack this hostname serves. Optional: a Domain
+	 * without a target is a free-form DNS / tunnel declaration.
+	 * Also picks the tunnel bound to the Server it runs on.
+	 */
+	target?: ResourceTarget;
+	/** Service name inside the target Stack. Empty for Deployments. */
+	service?: string;
+	/** Published port of the target service. 0 = unknown. */
+	port?: number;
+	/** DNS record settings. Leave `account` empty to not manage DNS. */
+	dns?: DnsBinding;
+	/**
+	 * Tunnel / ingress settings. Leave `account` empty to only manage DNS
+	 * (eg. point the hostname at an IP or another CNAME).
+	 */
+	ingress?: IngressBinding;
+	/**
+	 * What to do with remote objects created by Komodo when
+	 * this Domain is deleted. Default: `Cleanup`.
+	 */
+	on_delete?: OnDelete;
+}
+
+export type DomainStatus = 
+	| { type: "Ready", data?: undefined }
+	| { type: "Drifted", data: {
+	reasons: DomainReason[];
+}}
+	| { type: "Error", data: {
+	reason: DomainReason;
+}};
+
+export enum DomainLayer {
+	Dns = "Dns",
+	Ingress = "Ingress",
+}
+
+/** A remote object Komodo created. Drift and cleanup only consider these. */
+export interface OwnedObject {
+	layer: DomainLayer;
+	/** The Domain account name used to create it. */
+	account: string;
+	/** Hostname the object serves. */
+	key: string;
+	/** Provider object id (DNS record id; empty for tunnel rules). */
+	remote_id: string;
+	/** Opaque provider container (zone id / tunnel id). Needed for cleanup. */
+	scope: string;
+	/** Digest of the user controlled fields as last written by Komodo. */
+	applied_digest: string;
+}
+
+/** System maintained state, not user configurable. */
+export interface DomainInfo {
+	/** Last observed status. `None` = never checked. */
+	status?: DomainStatus;
+	/** When status was last observed (ms). */
+	observed_at?: I64;
+	/** Remote objects created and claimed by Komodo. */
+	owned?: OwnedObject[];
+}
+
+export type Domain = Resource<DomainConfig, DomainInfo>;
+
+/** How a hostname reaches the service. */
+export enum DomainMode {
+	/** Tunnel if the target's Server has one, else DNS. */
+	Auto = "Auto",
+	Tunnel = "Tunnel",
+	Dns = "Dns",
+}
+
+export interface ObjectRef {
+	/** `dns_record` | `tunnel_rule` */
+	kind: string;
+	/** The hostname */
+	key: string;
+	remote_id?: string;
+}
+
+export enum ChangeAction {
+	Create = "Create",
+	Update = "Update",
+	Delete = "Delete",
+	Noop = "Noop",
+	/**
+	 * Remote object exists but is not owned by Komodo.
+	 * Apply refuses unless `adopt_conflicts` is set.
+	 */
+	Conflict = "Conflict",
+}
+
+export type JsonValue = any;
+
+export enum ChangeReason {
+	Missing = "Missing",
+	ContentDiffers = "ContentDiffers",
+	/** Object created by Komodo was edited remotely. */
+	ManualEdit = "ManualEdit",
+	NotOwned = "NotOwned",
+	HostnameChanged = "HostnameChanged",
+	/** Owned object no longer declared by the config. */
+	OrphanOwned = "OrphanOwned",
+}
+
+export interface Change {
+	layer: DomainLayer;
+	object: ObjectRef;
+	action: ChangeAction;
+	/** Normalized current remote content */
+	before?: JsonValue;
+	/** Normalized desired content */
+	after?: JsonValue;
+	reason?: ChangeReason;
+}
+
+/**
+ * A machine readable problem. `code` is stable.
+ * 
+ * Codes: `AccountNotFound` `AccountKindMismatch` `InvalidConfig`
+ * `ZoneNotFound` `TunnelNotFound` `TunnelAmbiguous` `AuthFailed`
+ * `RateLimited` `ProviderUnavailable` `ProviderRejected`
+ * `ProviderResponse` `Timeout` `RecordMissing` `RecordChanged`
+ * `RuleMissing` `RuleChanged` `ForeignRecordConflict` `PlanChanged`
+ */
+export interface DomainReason {
+	code: string;
+	layer?: DomainLayer;
+	object_key?: string;
+	/** Human readable summary. Never contains tokens or provider response bodies. */
+	message: string;
+	retryable: boolean;
+}
+
+/** Result of AddServiceDomain. */
+export interface ServiceDomainResult {
+	/** Set once the Domain was created (and applied). */
+	domain?: Domain;
+	/** `Tunnel` or `Dns`, whichever was chosen. */
+	mode?: DomainMode;
+	/**
+	 * Remote objects which exist but are not managed by Komodo.
+	 * Non empty + `domain` unset = confirm, then retry with `adopt_conflicts`.
+	 */
+	conflicts: Change[];
+	/** Plain language notes, eg. LAN only. */
+	warnings: string[];
+	/** Why nothing was done / what failed, in plain language. */
+	error?: string;
+	/** Machine readable apply failure, if apply started and failed. */
+	reason?: DomainReason;
+}
+
+export type AddServiceDomainResponse = ServiceDomainResult;
+
+export type AlerterEndpoint = 
+	/** Send alert serialized to JSON to an http endpoint. */
+	| { type: "Custom", params: CustomAlerterEndpoint }
+	/** Send alert to a Slack app */
+	| { type: "Slack", params: SlackAlerterEndpoint }
+	/** Send alert to a Discord app */
+	| { type: "Discord", params: DiscordAlerterEndpoint }
+	/** Send alert to Ntfy */
+	| { type: "Ntfy", params: NtfyAlerterEndpoint }
+	/** Send alert to Pushover */
+	| { type: "Pushover", params: PushoverAlerterEndpoint };
 
 /** Types of maintenance schedules */
 export enum MaintenanceScheduleType {
@@ -1075,17 +1289,10 @@ export interface CreateApiKeyResponse {
 
 export type CreateApiKeyForServiceUserResponse = CreateApiKeyResponse;
 
-export type JsonValue = any;
-
 export enum DomainAccountSource {
 	Database = "Database",
 	/** Declared in Core config, read only. */
 	Config = "Config",
-}
-
-export enum DomainLayer {
-	Dns = "Dns",
-	Ingress = "Ingress",
 }
 
 /** Redacted account view returned by the API. Never contains the token. */
@@ -1610,119 +1817,6 @@ export interface DomainDiscovery {
 
 export type DiscoverDomainAccountResponse = DomainDiscovery;
 
-export enum DnsRecordType {
-	A = "A",
-	AAAA = "AAAA",
-	CNAME = "CNAME",
-}
-
-/** DNS record settings of a Domain. */
-export interface DnsBinding {
-	/** Name of the Domain account which manages DNS. Empty = DNS not managed. */
-	account?: string;
-	/** Default: `CNAME` */
-	record_type?: DnsRecordType;
-	/**
-	 * Record content. If empty, taken from the ingress tunnel
-	 * (eg. `<tunnel-id>.cfargotunnel.com`).
-	 */
-	content?: string;
-	/** TTL seconds. 0 / unset = provider automatic. */
-	ttl?: number;
-	/**
-	 * Whether to proxy through the provider. Unset = provider decides
-	 * (proxied when pointing at a tunnel).
-	 */
-	proxied?: boolean;
-}
-
-/** Tunnel / ingress settings of a Domain. */
-export interface IngressBinding {
-	/**
-	 * Name of the Domain account which owns the tunnel.
-	 * Empty = ingress not managed.
-	 */
-	account?: string;
-	/**
-	 * Name of a tunnel registered on the account.
-	 * If empty, picked automatically from the Server `target` runs on.
-	 */
-	tunnel?: string;
-	/** Origin service, eg. `http://localhost:8080`. */
-	service?: string;
-	/**
-	 * Optional Deployment / Stack. Used to pick the tunnel bound to
-	 * the Server it runs on when `tunnel` is empty.
-	 */
-	target?: ResourceTarget;
-}
-
-export enum OnDelete {
-	/** Remove remote objects created by Komodo. Delete is refused if cleanup fails. */
-	Cleanup = "Cleanup",
-	/** Leave remote objects untouched. */
-	Retain = "Retain",
-}
-
-/**
- * Declares how a public hostname reaches a service:
- * one DNS record and / or one tunnel ingress rule.
- * 
- * DNS zone is auto-detected from the account (longest suffix match).
- */
-export interface DomainConfig {
-	/** The full hostname, eg. `app.example.com`. Lowercased on save. */
-	hostname?: string;
-	/** DNS record settings. Leave `account` empty to not manage DNS. */
-	dns?: DnsBinding;
-	/**
-	 * Tunnel / ingress settings. Leave `account` empty to only manage DNS
-	 * (eg. point the hostname at an IP or another CNAME).
-	 */
-	ingress?: IngressBinding;
-	/**
-	 * What to do with remote objects created by Komodo when
-	 * this Domain is deleted. Default: `Cleanup`.
-	 */
-	on_delete?: OnDelete;
-}
-
-export type DomainStatus = 
-	| { type: "Ready", data?: undefined }
-	| { type: "Drifted", data: {
-	reasons: DomainReason[];
-}}
-	| { type: "Error", data: {
-	reason: DomainReason;
-}};
-
-/** A remote object Komodo created. Drift and cleanup only consider these. */
-export interface OwnedObject {
-	layer: DomainLayer;
-	/** The Domain account name used to create it. */
-	account: string;
-	/** Hostname the object serves. */
-	key: string;
-	/** Provider object id (DNS record id; empty for tunnel rules). */
-	remote_id: string;
-	/** Opaque provider container (zone id / tunnel id). Needed for cleanup. */
-	scope: string;
-	/** Digest of the user controlled fields as last written by Komodo. */
-	applied_digest: string;
-}
-
-/** System maintained state, not user configurable. */
-export interface DomainInfo {
-	/** Last observed status. `None` = never checked. */
-	status?: DomainStatus;
-	/** When status was last observed (ms). */
-	observed_at?: I64;
-	/** Remote objects created and claimed by Komodo. */
-	owned?: OwnedObject[];
-}
-
-export type Domain = Resource<DomainConfig, DomainInfo>;
-
 export interface DomainListItemInfo {
 	/** The full hostname, eg. `app.example.com` */
 	hostname: string;
@@ -1733,6 +1827,11 @@ export interface DomainListItemInfo {
 	 * Empty if ingress is not managed.
 	 */
 	ingress_account: string;
+	/** Bound Deployment / Stack, if any. */
+	target?: ResourceTarget;
+	/** Stack service name, empty otherwise. */
+	service?: string;
+	port?: number;
 	/**
 	 * `ready` | `drifted` | `error` | `unchecked`.
 	 * Cached from the last plan / apply, listing never calls the provider.
@@ -2139,66 +2238,6 @@ export interface ContainerStats {
 export type GetDeploymentStatsResponse = ContainerStats;
 
 export type GetDomainAccountResponse = DomainAccount;
-
-export interface ObjectRef {
-	/** `dns_record` | `tunnel_rule` */
-	kind: string;
-	/** The hostname */
-	key: string;
-	remote_id?: string;
-}
-
-export enum ChangeAction {
-	Create = "Create",
-	Update = "Update",
-	Delete = "Delete",
-	Noop = "Noop",
-	/**
-	 * Remote object exists but is not owned by Komodo.
-	 * Apply refuses unless `adopt_conflicts` is set.
-	 */
-	Conflict = "Conflict",
-}
-
-export enum ChangeReason {
-	Missing = "Missing",
-	ContentDiffers = "ContentDiffers",
-	/** Object created by Komodo was edited remotely. */
-	ManualEdit = "ManualEdit",
-	NotOwned = "NotOwned",
-	HostnameChanged = "HostnameChanged",
-	/** Owned object no longer declared by the config. */
-	OrphanOwned = "OrphanOwned",
-}
-
-export interface Change {
-	layer: DomainLayer;
-	object: ObjectRef;
-	action: ChangeAction;
-	/** Normalized current remote content */
-	before?: JsonValue;
-	/** Normalized desired content */
-	after?: JsonValue;
-	reason?: ChangeReason;
-}
-
-/**
- * A machine readable problem. `code` is stable.
- * 
- * Codes: `AccountNotFound` `AccountKindMismatch` `InvalidConfig`
- * `ZoneNotFound` `TunnelNotFound` `TunnelAmbiguous` `AuthFailed`
- * `RateLimited` `ProviderUnavailable` `ProviderRejected`
- * `ProviderResponse` `Timeout` `RecordMissing` `RecordChanged`
- * `RuleMissing` `RuleChanged` `ForeignRecordConflict` `PlanChanged`
- */
-export interface DomainReason {
-	code: string;
-	layer?: DomainLayer;
-	object_key?: string;
-	/** Human readable summary. Never contains tokens or provider response bodies. */
-	message: string;
-	retryable: boolean;
-}
 
 export interface DomainPlan {
 	/** Domain id */
@@ -5895,6 +5934,8 @@ export type ServerListItem = ResourceListItem<ServerListItemInfo>;
 
 export type ListServersResponse = ServerListItem[];
 
+export type ListServiceDomainsResponse = DomainListItem[];
+
 export type ListStackServicesResponse = StackService[];
 
 export enum StackState {
@@ -6362,6 +6403,27 @@ export type _PartialSwarmConfig = Partial<SwarmConfig>;
 export type _PartialTag = Partial<Tag>;
 
 export type _PartialUrlBuilderConfig = Partial<UrlBuilderConfig>;
+
+/**
+ * **Admin only.** One step: give a Deployment / Stack service a public
+ * hostname. Validates, derives account / zone / tunnel / record from the
+ * target's Server, creates the Domain and applies it.
+ * If remote objects exist which Komodo does not own and `adopt_conflicts`
+ * is false, nothing is written and they are returned in `conflicts`.
+ * Response: [AddServiceDomainResponse].
+ */
+export interface AddServiceDomain {
+	/** Deployment or Stack (id or name inside the target). */
+	target: ResourceTarget;
+	/** Service name, required for Stacks. */
+	service?: string;
+	/** Full hostname, eg. `app.example.com`. */
+	hostname: string;
+	/** Published port. Detected from the Deployment config when 0. */
+	port?: number;
+	mode?: DomainMode;
+	adopt_conflicts?: boolean;
+}
 
 /** **Admin only.** Add a user to a user group. Response: [UserGroup] */
 export interface AddUserToUserGroup {
@@ -10396,6 +10458,14 @@ export interface ListServers {
 	sort_desc?: boolean;
 }
 
+/**
+ * List the domains bound to a Deployment / Stack (optionally one Stack
+ * service). Response: [ListServiceDomainsResponse].
+ */
+export interface ListServiceDomains {
+	target: ResourceTarget;
+}
+
 /** Lists a specific stacks services (the containers). Response: [ListStackServicesResponse]. */
 export interface ListStackServices {
 	/** Id or name */
@@ -12588,6 +12658,7 @@ export type ReadRequest =
 	| { type: "GetDomain", params: GetDomain }
 	| { type: "ListDomains", params: ListDomains }
 	| { type: "ListFullDomains", params: ListFullDomains }
+	| { type: "ListServiceDomains", params: ListServiceDomains }
 	| { type: "GetDomainPlan", params: GetDomainPlan }
 	| { type: "ListDomainProviderKinds", params: ListDomainProviderKinds }
 	| { type: "ListDomainAccounts", params: ListDomainAccounts }
@@ -12753,6 +12824,7 @@ export type WriteRequest =
 	| { type: "RenameAlerter", params: RenameAlerter }
 	| { type: "CreateDomain", params: CreateDomain }
 	| { type: "CopyDomain", params: CopyDomain }
+	| { type: "AddServiceDomain", params: AddServiceDomain }
 	| { type: "DeleteDomain", params: DeleteDomain }
 	| { type: "UpdateDomain", params: UpdateDomain }
 	| { type: "RenameDomain", params: RenameDomain }

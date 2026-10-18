@@ -4,7 +4,7 @@ use komodo_client::{
   api::write::*,
   entities::{
     Operation, ResourceTarget,
-    domain::Domain,
+    domain::{Domain, ServiceDomainResult},
     domain_account::{DomainAccount, DomainAccountDoc},
     permission::PermissionLevel,
     update::Update,
@@ -19,6 +19,7 @@ use crate::{
     accounts::{self, ResolvedAccount},
     error::DomainError,
     provider::factory,
+    service::{AddRequest, add_service_domain},
   },
   helpers::update::{add_update, make_update},
   permission::get_check_permissions,
@@ -40,6 +41,33 @@ impl Resolve<WriteArgs> for CreateDomain {
   ) -> mogh_error::Result<Domain> {
     resource::create::<Domain>(&self.name, self.config, None, user)
       .await
+  }
+}
+
+impl Resolve<WriteArgs> for AddServiceDomain {
+  #[instrument(
+    "AddServiceDomain",
+    skip_all,
+    fields(operator = user.id, hostname = self.hostname)
+  )]
+  async fn resolve(
+    self,
+    WriteArgs { user }: &WriteArgs,
+  ) -> mogh_error::Result<ServiceDomainResult> {
+    require_admin(user, "add service domains with")?;
+    add_service_domain(
+      AddRequest {
+        target: self.target,
+        service: self.service,
+        hostname: self.hostname,
+        port: self.port,
+        mode: self.mode,
+        adopt_conflicts: self.adopt_conflicts,
+      },
+      user,
+    )
+    .await
+    .map_err(bad_request)
   }
 }
 

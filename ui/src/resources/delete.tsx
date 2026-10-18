@@ -4,6 +4,12 @@ import { usePermissions, useRead, useWrite } from "@/lib/hooks";
 import { usableResourcePath } from "@/lib/utils";
 import { ConfirmModal } from "mogh_ui";
 import { ICONS } from "@/lib/icons";
+import { useState } from "react";
+import {
+  BoundDomainsNotice,
+  deleteDomains,
+  useBoundDomains,
+} from "@/resources/domain/bound-domains";
 
 export default function DeleteResource({
   type,
@@ -13,6 +19,8 @@ export default function DeleteResource({
   id: string;
 }) {
   const nav = useNavigate();
+  const domains = useBoundDomains(type, id);
+  const [withDomains, setWithDomains] = useState(false);
   const key = type === "ResourceSync" ? "sync" : type.toLowerCase();
   const { canWrite } = usePermissions({ type, id });
   const resource = useRead(`Get${type}`, {
@@ -36,7 +44,17 @@ export default function DeleteResource({
       targetNoIcon
       targetProps={{ w: "fit", px: "xs" }}
       confirmText={resource.name}
-      onConfirm={() => mutateAsync({ id })}
+      additional={
+        <BoundDomainsNotice
+          domains={domains}
+          checked={withDomains}
+          onChange={setWithDomains}
+        />
+      }
+      onConfirm={async () => {
+        if (withDomains) await deleteDomains(domains);
+        return mutateAsync({ id });
+      }}
       loading={isPending}
       confirmProps={{ variant: "filled", color: "red" }}
     >

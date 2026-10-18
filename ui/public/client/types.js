@@ -52,6 +52,55 @@ export var TemplatesQueryBehavior;
     /** Results *only* includes templates. */
     TemplatesQueryBehavior["Only"] = "Only";
 })(TemplatesQueryBehavior || (TemplatesQueryBehavior = {}));
+export var DnsRecordType;
+(function (DnsRecordType) {
+    DnsRecordType["A"] = "A";
+    DnsRecordType["AAAA"] = "AAAA";
+    DnsRecordType["CNAME"] = "CNAME";
+})(DnsRecordType || (DnsRecordType = {}));
+export var OnDelete;
+(function (OnDelete) {
+    /** Remove remote objects created by Komodo. Delete is refused if cleanup fails. */
+    OnDelete["Cleanup"] = "Cleanup";
+    /** Leave remote objects untouched. */
+    OnDelete["Retain"] = "Retain";
+})(OnDelete || (OnDelete = {}));
+export var DomainLayer;
+(function (DomainLayer) {
+    DomainLayer["Dns"] = "Dns";
+    DomainLayer["Ingress"] = "Ingress";
+})(DomainLayer || (DomainLayer = {}));
+/** How a hostname reaches the service. */
+export var DomainMode;
+(function (DomainMode) {
+    /** Tunnel if the target's Server has one, else DNS. */
+    DomainMode["Auto"] = "Auto";
+    DomainMode["Tunnel"] = "Tunnel";
+    DomainMode["Dns"] = "Dns";
+})(DomainMode || (DomainMode = {}));
+export var ChangeAction;
+(function (ChangeAction) {
+    ChangeAction["Create"] = "Create";
+    ChangeAction["Update"] = "Update";
+    ChangeAction["Delete"] = "Delete";
+    ChangeAction["Noop"] = "Noop";
+    /**
+     * Remote object exists but is not owned by Komodo.
+     * Apply refuses unless `adopt_conflicts` is set.
+     */
+    ChangeAction["Conflict"] = "Conflict";
+})(ChangeAction || (ChangeAction = {}));
+export var ChangeReason;
+(function (ChangeReason) {
+    ChangeReason["Missing"] = "Missing";
+    ChangeReason["ContentDiffers"] = "ContentDiffers";
+    /** Object created by Komodo was edited remotely. */
+    ChangeReason["ManualEdit"] = "ManualEdit";
+    ChangeReason["NotOwned"] = "NotOwned";
+    ChangeReason["HostnameChanged"] = "HostnameChanged";
+    /** Owned object no longer declared by the config. */
+    ChangeReason["OrphanOwned"] = "OrphanOwned";
+})(ChangeReason || (ChangeReason = {}));
 /** Types of maintenance schedules */
 export var MaintenanceScheduleType;
 (function (MaintenanceScheduleType) {
@@ -237,11 +286,6 @@ export var DomainAccountSource;
     /** Declared in Core config, read only. */
     DomainAccountSource["Config"] = "Config";
 })(DomainAccountSource || (DomainAccountSource = {}));
-export var DomainLayer;
-(function (DomainLayer) {
-    DomainLayer["Dns"] = "Dns";
-    DomainLayer["Ingress"] = "Ingress";
-})(DomainLayer || (DomainLayer = {}));
 export var RestartMode;
 (function (RestartMode) {
     RestartMode["NoRestart"] = "no";
@@ -291,19 +335,6 @@ export var DeploymentState;
     /** Server / Swarm not reachable for status */
     DeploymentState["Unknown"] = "unknown";
 })(DeploymentState || (DeploymentState = {}));
-export var DnsRecordType;
-(function (DnsRecordType) {
-    DnsRecordType["A"] = "A";
-    DnsRecordType["AAAA"] = "AAAA";
-    DnsRecordType["CNAME"] = "CNAME";
-})(DnsRecordType || (DnsRecordType = {}));
-export var OnDelete;
-(function (OnDelete) {
-    /** Remove remote objects created by Komodo. Delete is refused if cleanup fails. */
-    OnDelete["Cleanup"] = "Cleanup";
-    /** Leave remote objects untouched. */
-    OnDelete["Retain"] = "Retain";
-})(OnDelete || (OnDelete = {}));
 /** Severity level of problem. */
 export var SeverityLevel;
 (function (SeverityLevel) {
@@ -326,29 +357,6 @@ export var SeverityLevel;
      */
     SeverityLevel["Critical"] = "CRITICAL";
 })(SeverityLevel || (SeverityLevel = {}));
-export var ChangeAction;
-(function (ChangeAction) {
-    ChangeAction["Create"] = "Create";
-    ChangeAction["Update"] = "Update";
-    ChangeAction["Delete"] = "Delete";
-    ChangeAction["Noop"] = "Noop";
-    /**
-     * Remote object exists but is not owned by Komodo.
-     * Apply refuses unless `adopt_conflicts` is set.
-     */
-    ChangeAction["Conflict"] = "Conflict";
-})(ChangeAction || (ChangeAction = {}));
-export var ChangeReason;
-(function (ChangeReason) {
-    ChangeReason["Missing"] = "Missing";
-    ChangeReason["ContentDiffers"] = "ContentDiffers";
-    /** Object created by Komodo was edited remotely. */
-    ChangeReason["ManualEdit"] = "ManualEdit";
-    ChangeReason["NotOwned"] = "NotOwned";
-    ChangeReason["HostnameChanged"] = "HostnameChanged";
-    /** Owned object no longer declared by the config. */
-    ChangeReason["OrphanOwned"] = "OrphanOwned";
-})(ChangeReason || (ChangeReason = {}));
 export var Timelength;
 (function (Timelength) {
     /** `1-sec` */

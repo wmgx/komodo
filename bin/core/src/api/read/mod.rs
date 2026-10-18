@@ -246,6 +246,7 @@ enum ReadRequest {
   GetDomain(GetDomain),
   ListDomains(ListDomains),
   ListFullDomains(ListFullDomains),
+  ListServiceDomains(ListServiceDomains),
   GetDomainPlan(GetDomainPlan),
   ListDomainProviderKinds(ListDomainProviderKinds),
   ListDomainAccounts(ListDomainAccounts),

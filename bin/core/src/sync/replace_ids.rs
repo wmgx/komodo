@@ -256,7 +256,7 @@ impl ReplaceIds for Alerter {
 
 impl ReplaceIds for Domain {
   fn replace_ids(config: &mut Self::Config) {
-    if let Some(target) = &mut config.ingress.target {
+    if let Some(target) = &mut config.target {
       let all = all_resources_cache().load();
       replace_resource_target_ids!(target, all, {
         Swarm => swarms,

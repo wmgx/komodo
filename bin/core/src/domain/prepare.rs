@@ -87,7 +87,7 @@ pub fn account_names_of(domain: &Domain) -> Vec<String> {
   names
 }
 
-fn find_by_id_or_name<'a, T>(
+pub(super) fn find_by_id_or_name<'a, T>(
   map: &'a std::collections::HashMap<String, T>,
   id_or_name: &str,
   name_of: impl Fn(&T) -> &str,
@@ -98,13 +98,13 @@ fn find_by_id_or_name<'a, T>(
 }
 
 /// The Server a Deployment / Stack runs on.
-fn server_of(
+pub(super) fn server_of(
   target: &ResourceTarget,
 ) -> Result<Option<ServerRef>, DomainError> {
   let all = all_resources_cache().load();
   let not_found = |kind: &str, id: &str| {
     DomainError::invalid(format!(
-      "ingress.target: {kind} '{id}' does not exist"
+      "target: {kind} '{id}' does not exist"
     ))
   };
   let server_id = match target {
@@ -124,7 +124,7 @@ fn server_of(
     }
     _ => {
       return Err(DomainError::invalid(
-        "ingress.target must be a Deployment or Stack",
+        "target must be a Deployment or Stack",
       ));
     }
   };
@@ -177,7 +177,7 @@ pub async fn prepare(
     provider
       .validate(&binding.service)
       .map_err(LayerError::ingress)?;
-    let server = match (&binding.target, binding.tunnel.is_empty()) {
+    let server = match (&config.target, binding.tunnel.is_empty()) {
       (Some(target), true) => {
         server_of(target).map_err(LayerError::ingress)?
       }

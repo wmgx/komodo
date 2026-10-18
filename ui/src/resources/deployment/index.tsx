@@ -1,4 +1,5 @@
 import { deploymentStateIntention } from "@/lib/color";
+import { DeploymentDomains } from "@/resources/domain/service-domains";
 import { useListItem, useRead } from "@/lib/hooks";
 import { ICONS } from "@/lib/icons";
 import { RequiredResourceComponents } from "..";
@@ -293,5 +294,5 @@ export const DeploymentComponents: RequiredResourceComponents<
 
   Config: DeploymentTabs,
 
-  Page: {},
+  Page: { Domains: DeploymentDomains },
 };

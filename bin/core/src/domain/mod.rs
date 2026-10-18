@@ -11,10 +11,12 @@
 
 pub mod accounts;
 pub mod apply;
+pub mod auto;
 pub mod error;
 pub mod lock;
 pub mod plan;
 pub mod prepare;
 pub mod provider;
+pub mod service;
 pub mod store;
 pub mod validate;

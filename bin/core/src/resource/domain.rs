@@ -50,6 +50,9 @@ impl super::KomodoResource for Domain {
         hostname: domain.config.hostname,
         dns_account: domain.config.dns.account,
         ingress_account: domain.config.ingress.account,
+        target: domain.config.target,
+        service: domain.config.service,
+        port: domain.config.port,
         status_code: domain
           .info
           .status

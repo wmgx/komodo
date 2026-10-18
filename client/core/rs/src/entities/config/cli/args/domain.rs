@@ -6,6 +6,37 @@ pub enum DomainCommand {
   Apply(DomainApplyArgs),
   /// Show the last observed status of a Domain.
   Status(DomainStatusArgs),
+  /// Give a Deployment / Stack service a hostname in one step.
+  Add(DomainAddArgs),
+}
+
+#[derive(Debug, Clone, clap::ValueEnum)]
+pub enum DomainAddKind {
+  Stack,
+  Deployment,
+}
+
+#[derive(Debug, Clone, clap::Parser)]
+pub struct DomainAddArgs {
+  /// `stack` or `deployment`.
+  pub kind: DomainAddKind,
+  /// Stack / Deployment name or id.
+  pub name: String,
+  /// Full hostname, eg. app.example.com
+  pub hostname: String,
+  /// Compose service name (Stacks only).
+  #[arg(long, default_value = "")]
+  pub service: String,
+  /// Published port. Detected from Deployment config when omitted.
+  #[arg(long, default_value_t = 0)]
+  pub port: u16,
+  /// auto (default), tunnel or dns.
+  #[arg(long, value_enum, default_value_t = crate::entities::domain::DomainMode::Auto)]
+  pub mode: crate::entities::domain::DomainMode,
+  /// Overwrite existing remote records which Komodo does not own,
+  /// without asking.
+  #[arg(long, short = 'y', default_value_t = false)]
+  pub yes: bool,
 }
 
 #[derive(Debug, Clone, clap::Parser)]

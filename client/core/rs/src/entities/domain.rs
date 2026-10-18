@@ -25,6 +25,14 @@ pub struct DomainListItemInfo {
   /// Name of the account managing the tunnel / ingress rule.
   /// Empty if ingress is not managed.
   pub ingress_account: String,
+  /// Bound Deployment / Stack, if any.
+  #[serde(default)]
+  pub target: Option<ResourceTarget>,
+  /// Stack service name, empty otherwise.
+  #[serde(default)]
+  pub service: String,
+  #[serde(default)]
+  pub port: u16,
   /// `ready` | `drifted` | `error` | `unchecked`.
   /// Cached from the last plan / apply, listing never calls the provider.
   pub status_code: String,
@@ -52,6 +60,20 @@ pub struct DomainConfig {
   /// The full hostname, eg. `app.example.com`. Lowercased on save.
   #[serde(default)]
   pub hostname: String,
+
+  /// The Deployment / Stack this hostname serves. Optional: a Domain
+  /// without a target is a free-form DNS / tunnel declaration.
+  /// Also picks the tunnel bound to the Server it runs on.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub target: Option<ResourceTarget>,
+
+  /// Service name inside the target Stack. Empty for Deployments.
+  #[serde(default)]
+  pub service: String,
+
+  /// Published port of the target service. 0 = unknown.
+  #[serde(default)]
+  pub port: u16,
 
   /// DNS record settings. Leave `account` empty to not manage DNS.
   #[serde(default)]
@@ -119,16 +141,12 @@ pub struct IngressBinding {
   #[serde(default)]
   pub account: String,
   /// Name of a tunnel registered on the account.
-  /// If empty, picked automatically from the Server `target` runs on.
+  /// If empty, picked automatically from the Server the Domain `target` runs on.
   #[serde(default)]
   pub tunnel: String,
   /// Origin service, eg. `http://localhost:8080`.
   #[serde(default)]
   pub service: String,
-  /// Optional Deployment / Stack. Used to pick the tunnel bound to
-  /// the Server it runs on when `tunnel` is empty.
-  #[serde(default, skip_serializing_if = "Option::is_none")]
-  pub target: Option<ResourceTarget>,
 }
 
 #[typeshare]
@@ -313,6 +331,48 @@ pub enum ChangeReason {
   HostnameChanged,
   /// Owned object no longer declared by the config.
   OrphanOwned,
+}
+
+// SERVICE DOMAINS
+
+/// How a hostname reaches the service.
+#[typeshare]
+#[derive(
+  Serialize,
+  Deserialize,
+  Debug,
+  Clone,
+  Copy,
+  PartialEq,
+  Eq,
+  Default,
+  clap::ValueEnum,
+)]
+pub enum DomainMode {
+  /// Tunnel if the target's Server has one, else DNS.
+  #[default]
+  Auto,
+  Tunnel,
+  Dns,
+}
+
+/// Result of AddServiceDomain.
+#[typeshare]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct ServiceDomainResult {
+  /// Set once the Domain was created (and applied).
+  pub domain: Option<Domain>,
+  /// `Tunnel` or `Dns`, whichever was chosen.
+  pub mode: Option<DomainMode>,
+  /// Remote objects which exist but are not managed by Komodo.
+  /// Non empty + `domain` unset = confirm, then retry with `adopt_conflicts`.
+  pub conflicts: Vec<Change>,
+  /// Plain language notes, eg. LAN only.
+  pub warnings: Vec<String>,
+  /// Why nothing was done / what failed, in plain language.
+  pub error: Option<String>,
+  /// Machine readable apply failure, if apply started and failed.
+  pub reason: Option<DomainReason>,
 }
 
 // QUERY

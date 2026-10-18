@@ -71,6 +71,30 @@ impl Resolve<ReadArgs> for ListDomains {
   }
 }
 
+impl Resolve<ReadArgs> for ListServiceDomains {
+  async fn resolve(
+    self,
+    ReadArgs { user }: &ReadArgs,
+  ) -> mogh_error::Result<ListServiceDomainsResponse> {
+    Ok(
+      resource::list_items_for_user::<Domain>(
+        Default::default(),
+        resource::ListItemsQueryOptions {
+          limit: 0,
+          page: 0,
+          sort_desc: false,
+          sort_by: resource::ListItemSort::Name,
+        },
+        user,
+        PermissionLevel::Read.into(),
+        &[],
+        |item| item.info.target.as_ref() == Some(&self.target),
+      )
+      .await?,
+    )
+  }
+}
+
 impl Resolve<ReadArgs> for ListFullDomains {
   async fn resolve(
     self,

@@ -5,8 +5,10 @@ use serde::{Deserialize, Serialize};
 use typeshare::typeshare;
 
 use crate::entities::{
-  JsonValue,
-  domain::{_PartialDomainConfig, Domain},
+  JsonValue, ResourceTarget,
+  domain::{
+    _PartialDomainConfig, Domain, DomainMode, ServiceDomainResult,
+  },
   domain_account::DomainAccount,
   update::Update,
 };
@@ -28,6 +30,39 @@ pub struct CreateDomain {
   #[serde(default)]
   pub config: _PartialDomainConfig,
 }
+
+//
+
+/// **Admin only.** One step: give a Deployment / Stack service a public
+/// hostname. Validates, derives account / zone / tunnel / record from the
+/// target's Server, creates the Domain and applies it.
+/// If remote objects exist which Komodo does not own and `adopt_conflicts`
+/// is false, nothing is written and they are returned in `conflicts`.
+/// Response: [AddServiceDomainResponse].
+#[typeshare]
+#[derive(Serialize, Deserialize, Debug, Clone, Resolve)]
+#[empty_traits(KomodoWriteRequest)]
+#[response(AddServiceDomainResponse)]
+#[error(mogh_error::Error)]
+pub struct AddServiceDomain {
+  /// Deployment or Stack (id or name inside the target).
+  pub target: ResourceTarget,
+  /// Service name, required for Stacks.
+  #[serde(default)]
+  pub service: String,
+  /// Full hostname, eg. `app.example.com`.
+  pub hostname: String,
+  /// Published port. Detected from the Deployment config when 0.
+  #[serde(default)]
+  pub port: u16,
+  #[serde(default)]
+  pub mode: DomainMode,
+  #[serde(default)]
+  pub adopt_conflicts: bool,
+}
+
+#[typeshare]
+pub type AddServiceDomainResponse = ServiceDomainResult;
 
 //
 
