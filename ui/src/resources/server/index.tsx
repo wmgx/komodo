@@ -23,6 +23,7 @@ import { ServerRamUsage } from "./stats/current/ram";
 import ServerDiskUsage from "./diskUsage";
 import ServerCpuUsage from "./stats/current/cpu";
 import { HoverError } from "mogh_ui";
+import { ServerTunnelSection } from "@/resources/domain/server-tunnel";
 
 export function useServer(
   id: string | undefined,
@@ -461,5 +462,5 @@ export const ServerComponents: RequiredResourceComponents<
 
   Config: ServerTabs,
 
-  Page: {},
+  Page: { Tunnel: ServerTunnelSection },
 };

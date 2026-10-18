@@ -9,7 +9,7 @@ use crate::entities::{
   domain::{
     _PartialDomainConfig, Domain, DomainMode, ServiceDomainResult,
   },
-  domain_account::DomainAccount,
+  domain_account::{DomainAccount, ServerTunnel},
   update::Update,
 };
 
@@ -63,6 +63,55 @@ pub struct AddServiceDomain {
 
 #[typeshare]
 pub type AddServiceDomainResponse = ServiceDomainResult;
+
+//
+
+/// **Admin only.** Open a tunnel for a Server in one step: creates the
+/// tunnel at the provider, binds it to the Server, and deploys the
+/// connector (cloudflared) there as a Deployment.
+/// Safe to call again: an enabled tunnel is returned as is, a half done one
+/// is continued. Response: [ServerTunnel].
+#[typeshare]
+#[derive(Serialize, Deserialize, Debug, Clone, Resolve)]
+#[empty_traits(KomodoWriteRequest)]
+#[response(EnableServerTunnelResponse)]
+#[error(mogh_error::Error)]
+pub struct EnableServerTunnel {
+  /// Server id or name.
+  #[serde(alias = "id", alias = "name")]
+  pub server: String,
+  /// Account to use. Optional when only one account can open tunnels.
+  pub account: Option<String>,
+  /// Connector image, eg. a mirror like
+  /// `docker.1ms.run/cloudflare/cloudflared:latest`. Remembered on the
+  /// account. Defaults to the account's last image, then the official one.
+  pub image: Option<String>,
+}
+
+#[typeshare]
+pub type EnableServerTunnelResponse = ServerTunnel;
+
+//
+
+/// **Admin only.** Remove the tunnel Komodo opened for a Server: the
+/// connector Deployment, then (by default) the tunnel at the provider, then
+/// the binding. Refused while a Domain still uses the tunnel.
+/// Response: [ServerTunnel].
+#[typeshare]
+#[derive(Serialize, Deserialize, Debug, Clone, Resolve)]
+#[empty_traits(KomodoWriteRequest)]
+#[response(DisableServerTunnelResponse)]
+#[error(mogh_error::Error)]
+pub struct DisableServerTunnel {
+  /// Server id or name.
+  #[serde(alias = "id", alias = "name")]
+  pub server: String,
+  /// Also delete the tunnel at the provider. Default: true.
+  pub delete_remote: Option<bool>,
+}
+
+#[typeshare]
+pub type DisableServerTunnelResponse = ServerTunnel;
 
 //
 

@@ -8,7 +8,7 @@ use crate::entities::{
   U64,
   domain::{Domain, DomainListItem, DomainPlan, DomainQuery},
   domain_account::{
-    DomainAccount, DomainDiscovery, DomainProviderKind,
+    DomainAccount, DomainDiscovery, DomainProviderKind, ServerTunnel,
   },
 };
 
@@ -154,6 +154,25 @@ pub struct GetDomainAccount {
 
 #[typeshare]
 pub type GetDomainAccountResponse = DomainAccount;
+
+//
+
+/// **Admin only.** The tunnel of a Server and its connector: whether it is
+/// enabled, the connector Deployment, and the provider side connection
+/// status. Response: [ServerTunnel].
+#[typeshare]
+#[derive(Serialize, Deserialize, Debug, Clone, Resolve)]
+#[empty_traits(KomodoReadRequest)]
+#[response(GetServerTunnelResponse)]
+#[error(mogh_error::Error)]
+pub struct GetServerTunnel {
+  /// Server id or name.
+  #[serde(alias = "id", alias = "name")]
+  pub server: String,
+}
+
+#[typeshare]
+pub type GetServerTunnelResponse = ServerTunnel;
 
 //
 

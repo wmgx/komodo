@@ -118,6 +118,7 @@ export function useAccessHint(
   );
   const host = address?.hostname;
   return {
+    serverId,
     serverName: server?.name,
     tunnel,
     host,

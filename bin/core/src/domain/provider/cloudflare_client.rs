@@ -455,6 +455,92 @@ impl CloudflareClient {
       .await?;
     Ok(())
   }
+
+  /// Create a remote-managed tunnel. Returns its id.
+  pub async fn create_tunnel(
+    &self,
+    account: &str,
+    name: &str,
+  ) -> Result<String> {
+    let path = format!("/accounts/{}/cfd_tunnel", segment(account)?);
+    let data = self
+      .request(
+        Method::POST,
+        &path,
+        Some(&serde_json::json!({
+          "name": name,
+          "config_src": "cloudflare",
+        })),
+      )
+      .await?;
+    data["result"]["id"]
+      .as_str()
+      .map(str::to_string)
+      .ok_or_else(|| malformed("created tunnel has no id"))
+  }
+
+  /// The connector token. Never log the return value.
+  pub async fn tunnel_token(
+    &self,
+    account: &str,
+    tunnel: &str,
+  ) -> Result<String> {
+    let path = format!(
+      "/accounts/{}/cfd_tunnel/{}/token",
+      segment(account)?,
+      segment(tunnel)?
+    );
+    let data = self.request(Method::GET, &path, None).await?;
+    data["result"]
+      .as_str()
+      .filter(|t| !t.is_empty())
+      .map(str::to_string)
+      .ok_or_else(|| malformed("tunnel token is not a string"))
+  }
+
+  /// `status` of a tunnel: healthy / degraded / down / inactive.
+  pub async fn tunnel_status(
+    &self,
+    account: &str,
+    tunnel: &str,
+  ) -> Result<String> {
+    let path = format!(
+      "/accounts/{}/cfd_tunnel/{}",
+      segment(account)?,
+      segment(tunnel)?
+    );
+    let data = self.request(Method::GET, &path, None).await?;
+    Ok(
+      data["result"]["status"]
+        .as_str()
+        .unwrap_or("inactive")
+        .to_string(),
+    )
+  }
+
+  /// Drop connections left by a connector which is gone, then delete the
+  /// tunnel. A missing tunnel is fine.
+  pub async fn delete_tunnel(
+    &self,
+    account: &str,
+    tunnel: &str,
+  ) -> Result<()> {
+    let base = format!(
+      "/accounts/{}/cfd_tunnel/{}",
+      segment(account)?,
+      segment(tunnel)?
+    );
+    for (path, tolerate_missing) in
+      [(format!("{base}/connections"), true), (base, true)]
+    {
+      match self.request(Method::DELETE, &path, None).await {
+        Ok(_) => {}
+        Err(e) if tolerate_missing && Self::is_not_found(&e) => {}
+        Err(e) => return Err(e),
+      }
+    }
+    Ok(())
+  }
 }
 
 #[cfg(test)]

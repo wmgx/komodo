@@ -3,6 +3,7 @@ use std::fmt;
 use serde::{Deserialize, Serialize};
 use typeshare::typeshare;
 
+use super::deployment::DeploymentState;
 use super::domain::DomainLayer;
 use super::{JsonValue, MongoId, config::empty_or_redacted};
 
@@ -143,6 +144,52 @@ pub struct DiscoveredIngress {
   /// Provider container (eg. Cloudflare account id).
   pub account_id: Option<String>,
   pub status: Option<String>,
+}
+
+/// Overall state of the tunnel on a Server, in plain terms.
+#[typeshare]
+#[derive(
+  Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default,
+)]
+pub enum ServerTunnelState {
+  /// No tunnel is bound to the Server.
+  #[default]
+  NotEnabled,
+  /// The connector is being deployed or is still connecting.
+  Starting,
+  Healthy,
+  /// Connected, but not with all connections.
+  Degraded,
+  Down,
+  /// Registered, but nothing is connected (connector missing / stopped).
+  Inactive,
+}
+
+/// The tunnel of one Server and the connector (cloudflared) running it.
+#[typeshare]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct ServerTunnel {
+  pub state: ServerTunnelState,
+  /// Account which owns the tunnel, or the one which would be used.
+  pub account: Option<String>,
+  /// Accounts which can open a tunnel by themselves. More than one means
+  /// the caller has to choose.
+  pub accounts: Vec<String>,
+  pub tunnel_name: Option<String>,
+  /// Created by Komodo (so Komodo may also delete it).
+  pub managed: bool,
+  /// Provider side connection status, eg. `healthy`.
+  pub remote_status: Option<String>,
+  /// Name / id of the connector Deployment.
+  pub deployment: Option<String>,
+  pub deployment_id: Option<String>,
+  pub deployment_state: Option<DeploymentState>,
+  /// Connector image which would be used (account default).
+  pub image: String,
+  /// Domains which currently use the tunnel.
+  pub domains: Vec<String>,
+  /// Plain language note about something half done / unreadable.
+  pub warning: Option<String>,
 }
 
 #[cfg(test)]

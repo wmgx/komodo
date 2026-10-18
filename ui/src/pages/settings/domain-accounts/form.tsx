@@ -139,6 +139,15 @@ export default function DomainAccountForm({
       }
     }
     const entries = Object.entries(tunnels);
+    // Created by one-click setup: keep the flag across edits.
+    const managed = new Set(
+      (
+        ((account?.params as { tunnels?: unknown[] } | undefined)?.tunnels ??
+          []) as { tunnel_id?: string; managed?: boolean }[]
+      )
+        .filter((t) => t?.managed)
+        .map((t) => t.tunnel_id),
+    );
     const names = entries.map(([, t]) => t.name.trim());
     if (names.some((n) => !n) || new Set(names).size !== names.length) {
       notifications.show({
@@ -155,6 +164,7 @@ export default function DomainAccountForm({
         account_id: t.account_id,
         tunnel_id,
         ...(t.server ? { server: t.server } : {}),
+        ...(managed.has(tunnel_id) ? { managed: true } : {}),
       })),
     };
   };

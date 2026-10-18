@@ -335,6 +335,20 @@ export var DeploymentState;
     /** Server / Swarm not reachable for status */
     DeploymentState["Unknown"] = "unknown";
 })(DeploymentState || (DeploymentState = {}));
+/** Overall state of the tunnel on a Server, in plain terms. */
+export var ServerTunnelState;
+(function (ServerTunnelState) {
+    /** No tunnel is bound to the Server. */
+    ServerTunnelState["NotEnabled"] = "NotEnabled";
+    /** The connector is being deployed or is still connecting. */
+    ServerTunnelState["Starting"] = "Starting";
+    ServerTunnelState["Healthy"] = "Healthy";
+    /** Connected, but not with all connections. */
+    ServerTunnelState["Degraded"] = "Degraded";
+    ServerTunnelState["Down"] = "Down";
+    /** Registered, but nothing is connected (connector missing / stopped). */
+    ServerTunnelState["Inactive"] = "Inactive";
+})(ServerTunnelState || (ServerTunnelState = {}));
 /** Severity level of problem. */
 export var SeverityLevel;
 (function (SeverityLevel) {

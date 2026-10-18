@@ -257,3 +257,113 @@ async fn discover_lists_zones_tunnels_and_warns_on_missing_permission()
   assert!(found.warnings[0].contains("Other"));
   assert!(!format!("{found:?}").contains("fixture-secret"));
 }
+
+fn provision_with(
+  fixture: &Fixture,
+) -> crate::domain::provider::cloudflare_provision::CloudflareProvision
+{
+  crate::domain::provider::cloudflare_provision::CloudflareProvision::new(
+    Arc::new(fixture.client(Duration::from_secs(2))),
+    Default::default(),
+  )
+}
+
+#[tokio::test]
+async fn provision_creates_tunnel_inits_config_and_fetches_token() {
+  use crate::domain::provider::ProvisionProvider;
+
+  let seen =
+    Arc::new(Mutex::new(Vec::<(String, String, Value)>::new()));
+  let log = seen.clone();
+  let fixture = Fixture::start(move |request| {
+    log.lock().unwrap().push((
+      request.method.clone(),
+      request.path.clone(),
+      request.body.clone(),
+    ));
+    match (request.method.as_str(), request.path.as_str()) {
+      ("GET", p) if p.starts_with("/accounts?") => {
+        Response::ok(json!([{ "id": "acc1", "name": "me" }]))
+      }
+      ("POST", "/accounts/acc1/cfd_tunnel") => {
+        Response::ok(json!({ "id": "tun1" }))
+      }
+      ("PUT", "/accounts/acc1/cfd_tunnel/tun1/configurations") => {
+        Response::ok(json!({}))
+      }
+      ("GET", "/accounts/acc1/cfd_tunnel/tun1/token") => {
+        Response::ok(json!("connector-token"))
+      }
+      _ => Response::error(404),
+    }
+  })
+  .await;
+  let done = provision_with(&fixture)
+    .provision("komodo-home", "mirror.example/cloudflared:latest")
+    .await
+    .unwrap();
+  assert_eq!(done.handle.id, "tun1");
+  assert_eq!(done.handle.scope, "acc1");
+  assert!(done.handle.managed);
+  assert_eq!(
+    done.connector.image,
+    "mirror.example/cloudflared:latest"
+  );
+  assert_eq!(done.connector.command, "tunnel --no-autoupdate run");
+  assert_eq!(
+    done.connector.env,
+    vec![("TUNNEL_TOKEN".to_string(), "connector-token".to_string())]
+  );
+  let seen = seen.lock().unwrap();
+  let create = seen
+    .iter()
+    .find(|(m, p, _)| m == "POST" && p.ends_with("/cfd_tunnel"))
+    .unwrap();
+  assert_eq!(
+    create.2,
+    json!({ "name": "komodo-home", "config_src": "cloudflare" })
+  );
+  let put = seen.iter().find(|(m, _, _)| m == "PUT").unwrap();
+  assert_eq!(
+    put.2,
+    json!({ "config": { "ingress": [{ "service": "http_status:404" }] } })
+  );
+}
+
+#[tokio::test]
+async fn provision_rolls_back_the_tunnel_when_token_fetch_fails() {
+  use crate::domain::provider::ProvisionProvider;
+
+  let seen = Arc::new(Mutex::new(Vec::<(String, String)>::new()));
+  let log = seen.clone();
+  let fixture = Fixture::start(move |request| {
+    log
+      .lock()
+      .unwrap()
+      .push((request.method.clone(), request.path.clone()));
+    match (request.method.as_str(), request.path.as_str()) {
+      ("GET", p) if p.starts_with("/accounts?") => {
+        Response::ok(json!([{ "id": "acc1", "name": "me" }]))
+      }
+      ("POST", "/accounts/acc1/cfd_tunnel") => {
+        Response::ok(json!({ "id": "tun1" }))
+      }
+      ("PUT", _) => Response::ok(json!({})),
+      ("GET", p) if p.ends_with("/token") => Response::error(403),
+      ("DELETE", _) => Response::ok(json!({})),
+      _ => Response::error(404),
+    }
+  })
+  .await;
+  let error = provision_with(&fixture)
+    .provision("komodo-home", "img")
+    .await
+    .err()
+    .unwrap();
+  assert_eq!(error.code, "AuthFailed");
+  assert!(!format!("{error:?}").contains("fixture-secret"));
+  let seen = seen.lock().unwrap();
+  assert!(seen.iter().any(|(m, p)| {
+    m == "DELETE" && p == "/accounts/acc1/cfd_tunnel/tun1"
+  }));
+}

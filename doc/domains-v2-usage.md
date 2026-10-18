@@ -1,6 +1,6 @@
 # 域名管理 v2 试用指南（Cloudflare）
 
-目标：用一个测试子域名（下文用 `komodo-test.example.com`）走完 创建 → plan → apply → 验证 → 删除。
+目标：给服务器开通隧道，再用一个测试子域名（下文用 `komodo-test.example.com`）走完 创建 → plan → apply → 验证 → 删除。
 
 ## 1. 创建权限收窄的 Cloudflare API token
 
@@ -28,7 +28,20 @@ Settings -> Domains -> New Account，不需要手写 JSON：
 
 之后编辑账号会自动用已保存的 token 重新读取；Token 留空表示不修改。非 Cloudflare 的 Kind（无结构化表单）才会显示折叠的「Advanced: params (JSON)」。
 
-## 3. 在服务页面添加域名（最短流程）
+## 3. 最短流程
+
+1. 创建 token（第 1 节，开通隧道需要「帐户 - Cloudflare Tunnel - 编辑」）并在 Settings -> Domains 建账号（第 2 节，隧道不用勾选，开通时会自动创建）。
+2. 给服务器开通隧道，二选一：
+   - 在服务页面点 Add domain，弹窗提示「这台服务器还没有隧道」时点 **为这台服务器开通隧道**；
+   - 或打开 Server 详情页的「Cloudflare Tunnel」区块点 **开通隧道**。
+   
+   确认框里可以改 cloudflared 镜像（VPS 访问不了 Docker Hub 时填镜像源，如 `docker.1ms.run/cloudflare/cloudflared:latest`，会记在账号上，下次自动带出）。点开通后 Komodo 会创建隧道、在该服务器上部署名为 `cloudflared-<服务器名>` 的 Deployment，几十秒内状态变为 healthy。
+3. 在服务页面 **Add domain**（第 4 节），弹窗会自动走 Tunnel。
+4. 用域名从外网访问。
+
+关闭：Server 详情页「Cloudflare Tunnel」区块点 **关闭隧道**（需要先删掉使用它的域名）。CLI：`km domain tunnel enable|disable|status <server>`。token 存放方式与残余风险见设计文档 6.2。
+
+## 4. 在服务页面添加域名
 
 1. 打开 Stack 或 Deployment 详情页，找到「Domains」区块，点 **Add domain**。
 2. 填主机名前缀（如 `app`），在下拉里选 zone（只有一个时自动选中）。只允许字母、数字、连字符，不能有下划线（`home_komodo` 要写成 `home-komodo`）。
@@ -42,13 +55,13 @@ Tunnel 的规则是 `hostname -> http://localhost:<发布端口>`，默认假定
 
 手工方式（高级）：侧边栏 Domains -> New，在 Service 里选目标和端口，必要时展开 Advanced 填 DNS 记录 / 隧道规则，保存后在 Plan 区块 Preview plan -> Apply。
 
-## 4. 验证
+## 5. 验证
 
 - Cloudflare 控制台：DNS 里出现 `komodo-test` 的 CNAME（comment 为 `komodo:<id>`），隧道的 Public Hostname 里出现对应规则。
 - 命令行：`dig +short komodo-test.example.com`，以及 `curl -I https://komodo-test.example.com`（需本机 8080 有服务）。
 - 再点一次 Preview plan，应全是 Noop。
 
-## 5. 删除并确认远端已清理
+## 6. 删除并确认远端已清理
 
 1. 在服务页面 Domains 区块点删除（或在 Domain 页面删除该资源）（On Delete 默认 Cleanup，会先清远端；失败则资源不会被删除，需修复后重试）。
 2. 在 Cloudflare 确认 CNAME 与隧道规则都已消失，且隧道里其它规则、catch-all 保持不变。
@@ -61,6 +74,10 @@ Tunnel 的规则是 `hostname -> http://localhost:<发布端口>`，默认假定
 km domain add stack my-stack app.example.com --service web --port 8080   # 一步完成，有冲突会询问；-y 直接覆盖
 km domain add deployment my-app app.example.com                           # 端口从 Deployment 的 ports 读取
 km list domains
+km domain tunnel enable my-server                  # 为服务器开通隧道（确认后执行，-y 免确认）
+km domain tunnel enable my-server --image docker.1ms.run/cloudflare/cloudflared:latest
+km domain tunnel status my-server                  # 开通状态、cloudflared 部署状态、Cloudflare 连接状态
+km domain tunnel disable my-server                 # 删除 cloudflared 与隧道；--keep-remote 保留 Cloudflare 上的隧道
 km domain plan komodo-test            # 加 --json 输出原始 JSON
 km domain status komodo-test          # 加 --json 输出原始 JSON
 km domain apply komodo-test           # 先显示 plan，回车确认
@@ -74,4 +91,6 @@ km execute apply-domain komodo-test   # 等价的通用执行命令
 - `AuthFailed` / `ZoneNotFound`：token 权限或授权范围不对，或 hostname 不在 `params.zones` 内。
 - `TunnelAmbiguous`：显式填写 Tunnel 名。apply 超时后出现 Conflict：确认是自己的规则后用 `--adopt-conflicts`。
 - 删除 Stack / Deployment 时，确认框会列出绑定的域名，可勾选「同时删除这些域名」；不勾选则 Domain 保留，状态显示「目标服务已不存在」。
-- 「DNS 解析到内网 IP」：只能局域网访问。外网访问需要隧道（一键开通隧道将在后续版本提供）。
+- 「DNS 解析到内网 IP」：只能局域网访问。外网访问需要隧道：在 Add domain 弹窗或 Server 页面一键开通。
+- 开通后状态一直是「未连接 / down」：到 `cloudflared-<服务器名>` 这个 Deployment 看日志；多半是服务器拉不到镜像（改用镜像源后再点开通重试）或服务器出站访问不了 Cloudflare。
+- 开通中途失败：直接再点一次开通即可继续，已创建的隧道不会重复创建；创建隧道后失败的步骤会自动删掉新建的隧道。

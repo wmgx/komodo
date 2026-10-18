@@ -252,6 +252,7 @@ enum ReadRequest {
   ListDomainAccounts(ListDomainAccounts),
   GetDomainAccount(GetDomainAccount),
   DiscoverDomainAccount(DiscoverDomainAccount),
+  GetServerTunnel(GetServerTunnel),
 
   // ==== TOML ====
   ExportAllResourcesToToml(ExportAllResourcesToToml),

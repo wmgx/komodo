@@ -157,6 +157,7 @@ export type ReadResponses = {
   ListDomainAccounts: Types.ListDomainAccountsResponse;
   GetDomainAccount: Types.GetDomainAccountResponse;
   DiscoverDomainAccount: Types.DiscoverDomainAccountResponse;
+  GetServerTunnel: Types.GetServerTunnelResponse;
 
   // ==== TOML ====
   ExportAllResourcesToToml: Types.ExportAllResourcesToTomlResponse;
@@ -309,6 +310,8 @@ export type WriteResponses = {
   CreateDomain: Types.Domain;
   CopyDomain: Types.Domain;
   AddServiceDomain: Types.AddServiceDomainResponse;
+  EnableServerTunnel: Types.EnableServerTunnelResponse;
+  DisableServerTunnel: Types.DisableServerTunnelResponse;
   DeleteDomain: Types.Domain;
   UpdateDomain: Types.Domain;
   RenameDomain: Types.Update;

@@ -1796,6 +1796,49 @@ export interface DeploymentQuerySpecifics {
 
 export type DeploymentQuery = ResourceQuery<DeploymentQuerySpecifics>;
 
+/** Overall state of the tunnel on a Server, in plain terms. */
+export enum ServerTunnelState {
+	/** No tunnel is bound to the Server. */
+	NotEnabled = "NotEnabled",
+	/** The connector is being deployed or is still connecting. */
+	Starting = "Starting",
+	Healthy = "Healthy",
+	/** Connected, but not with all connections. */
+	Degraded = "Degraded",
+	Down = "Down",
+	/** Registered, but nothing is connected (connector missing / stopped). */
+	Inactive = "Inactive",
+}
+
+/** The tunnel of one Server and the connector (cloudflared) running it. */
+export interface ServerTunnel {
+	state: ServerTunnelState;
+	/** Account which owns the tunnel, or the one which would be used. */
+	account?: string;
+	/**
+	 * Accounts which can open a tunnel by themselves. More than one means
+	 * the caller has to choose.
+	 */
+	accounts: string[];
+	tunnel_name?: string;
+	/** Created by Komodo (so Komodo may also delete it). */
+	managed: boolean;
+	/** Provider side connection status, eg. `healthy`. */
+	remote_status?: string;
+	/** Name / id of the connector Deployment. */
+	deployment?: string;
+	deployment_id?: string;
+	deployment_state?: DeploymentState;
+	/** Connector image which would be used (account default). */
+	image: string;
+	/** Domains which currently use the tunnel. */
+	domains: string[];
+	/** Plain language note about something half done / unreadable. */
+	warning?: string;
+}
+
+export type DisableServerTunnelResponse = ServerTunnel;
+
 export interface DiscoveredIngress {
 	/** Provider id (eg. tunnel id). */
 	id: string;
@@ -1845,6 +1888,8 @@ export interface DomainQuerySpecifics {
 }
 
 export type DomainQuery = ResourceQuery<DomainQuerySpecifics>;
+
+export type EnableServerTunnelResponse = ServerTunnel;
 
 /** Response containing pretty formatted toml contents. */
 export interface TomlResponse {
@@ -2746,6 +2791,8 @@ export interface ServerInfo {
 export type Server = Resource<ServerConfig, ServerInfo>;
 
 export type GetServerResponse = Server;
+
+export type GetServerTunnelResponse = ServerTunnel;
 
 export interface StackActionState {
 	pulling: boolean;
@@ -8145,6 +8192,19 @@ export interface DestroyStack {
 	stop_time?: number;
 }
 
+/**
+ * **Admin only.** Remove the tunnel Komodo opened for a Server: the
+ * connector Deployment, then (by default) the tunnel at the provider, then
+ * the binding. Refused while a Domain still uses the tunnel.
+ * Response: [ServerTunnel].
+ */
+export interface DisableServerTunnel {
+	/** Server id or name. */
+	server: string;
+	/** Also delete the tunnel at the provider. Default: true. */
+	delete_remote?: boolean;
+}
+
 /** Configuration for a Discord alerter. */
 export interface DiscordAlerterEndpoint {
 	/** The Discord webhook url */
@@ -8186,6 +8246,26 @@ export interface DomainAccountConfig {
 	token?: string;
 	params?: JsonValue;
 	description?: string;
+}
+
+/**
+ * **Admin only.** Open a tunnel for a Server in one step: creates the
+ * tunnel at the provider, binds it to the Server, and deploys the
+ * connector (cloudflared) there as a Deployment.
+ * Safe to call again: an enabled tunnel is returned as is, a half done one
+ * is continued. Response: [ServerTunnel].
+ */
+export interface EnableServerTunnel {
+	/** Server id or name. */
+	server: string;
+	/** Account to use. Optional when only one account can open tunnels. */
+	account?: string;
+	/**
+	 * Connector image, eg. a mirror like
+	 * `docker.1ms.run/cloudflare/cloudflared:latest`. Remembered on the
+	 * account. Defaults to the account's last image, then the official one.
+	 */
+	image?: string;
 }
 
 export interface EnvironmentVar {
@@ -8980,6 +9060,16 @@ export interface GetServerState {
 export interface GetServerStateResponse {
 	/** The server status. */
 	status: ServerState;
+}
+
+/**
+ * **Admin only.** The tunnel of a Server and its connector: whether it is
+ * enabled, the connector Deployment, and the provider side connection
+ * status. Response: [ServerTunnel].
+ */
+export interface GetServerTunnel {
+	/** Server id or name. */
+	server: string;
 }
 
 /**
@@ -12664,6 +12754,7 @@ export type ReadRequest =
 	| { type: "ListDomainAccounts", params: ListDomainAccounts }
 	| { type: "GetDomainAccount", params: GetDomainAccount }
 	| { type: "DiscoverDomainAccount", params: DiscoverDomainAccount }
+	| { type: "GetServerTunnel", params: GetServerTunnel }
 	| { type: "ExportAllResourcesToToml", params: ExportAllResourcesToToml }
 	| { type: "ExportResourcesToToml", params: ExportResourcesToToml }
 	| { type: "GetTag", params: GetTag }
@@ -12825,6 +12916,8 @@ export type WriteRequest =
 	| { type: "CreateDomain", params: CreateDomain }
 	| { type: "CopyDomain", params: CopyDomain }
 	| { type: "AddServiceDomain", params: AddServiceDomain }
+	| { type: "EnableServerTunnel", params: EnableServerTunnel }
+	| { type: "DisableServerTunnel", params: DisableServerTunnel }
 	| { type: "DeleteDomain", params: DeleteDomain }
 	| { type: "UpdateDomain", params: UpdateDomain }
 	| { type: "RenameDomain", params: RenameDomain }

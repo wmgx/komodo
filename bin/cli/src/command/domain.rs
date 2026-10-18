@@ -4,16 +4,20 @@ use comfy_table::{Attribute, Cell, Table};
 use komodo_client::{
   api::{
     execute::ApplyDomain,
-    read::{GetDomain, GetDomainPlan},
-    write::AddServiceDomain,
+    read::{GetDomain, GetDomainPlan, GetServerTunnel},
+    write::{
+      AddServiceDomain, DisableServerTunnel, EnableServerTunnel,
+    },
   },
   entities::{
     ResourceTarget,
     config::cli::args::domain::{
       DomainAddArgs, DomainAddKind, DomainApplyArgs, DomainCommand,
-      DomainPlanArgs, DomainStatusArgs,
+      DomainPlanArgs, DomainStatusArgs, TunnelCommand,
+      TunnelDisableArgs, TunnelEnableArgs, TunnelStatusArgs,
     },
     domain::{ChangeAction, DomainPlan, DomainReason, DomainStatus},
+    domain_account::{ServerTunnel, ServerTunnelState},
     update::{Update, UpdateStatus},
   },
 };
@@ -26,6 +30,11 @@ pub async fn handle(command: &DomainCommand) -> anyhow::Result<()> {
     DomainCommand::Apply(args) => apply(args).await,
     DomainCommand::Status(args) => status(args).await,
     DomainCommand::Add(args) => add(args).await,
+    DomainCommand::Tunnel { command } => match command {
+      TunnelCommand::Enable(args) => tunnel_enable(args).await,
+      TunnelCommand::Disable(args) => tunnel_disable(args).await,
+      TunnelCommand::Status(args) => tunnel_status(args).await,
+    },
   }
 }
 
@@ -268,5 +277,111 @@ fn print_update(update: &Update) {
     println!("\n{}", "APPLY SUCCESSFUL".green());
   } else {
     eprintln!("\n{}", "APPLY FAILED".red());
+  }
+}
+
+async fn tunnel_enable(
+  args: &TunnelEnableArgs,
+) -> anyhow::Result<()> {
+  let client = super::komodo_client().await?;
+  if !args.yes {
+    println!(
+      "This creates a Cloudflare Tunnel for '{}' and deploys a cloudflared container on it (Deployment 'cloudflared-{}').",
+      args.server, args.server
+    );
+    super::wait_for_enter("open the tunnel", false)?;
+  }
+  let tunnel = client
+    .write(EnableServerTunnel {
+      server: args.server.clone(),
+      account: args.account.clone(),
+      image: args.image.clone(),
+    })
+    .await
+    .context("Failed to open the tunnel")?;
+  print_tunnel(&tunnel);
+  println!(
+    "\nThe connector may need a few seconds to connect. Check with `km domain tunnel status {}`.",
+    args.server
+  );
+  Ok(())
+}
+
+async fn tunnel_disable(
+  args: &TunnelDisableArgs,
+) -> anyhow::Result<()> {
+  let client = super::komodo_client().await?;
+  if !args.yes {
+    println!(
+      "This removes the cloudflared Deployment of '{}'{}.",
+      args.server,
+      if args.keep_remote {
+        ""
+      } else {
+        " and deletes its tunnel at Cloudflare"
+      }
+    );
+    super::wait_for_enter("close the tunnel", false)?;
+  }
+  let tunnel = client
+    .write(DisableServerTunnel {
+      server: args.server.clone(),
+      delete_remote: Some(!args.keep_remote),
+    })
+    .await
+    .context("Failed to close the tunnel")?;
+  print_tunnel(&tunnel);
+  Ok(())
+}
+
+async fn tunnel_status(
+  args: &TunnelStatusArgs,
+) -> anyhow::Result<()> {
+  let client = super::komodo_client().await?;
+  let tunnel = client
+    .read(GetServerTunnel {
+      server: args.server.clone(),
+    })
+    .await
+    .context("Failed to get the tunnel")?;
+  if args.json {
+    println!("{}", serde_json::to_string_pretty(&tunnel)?);
+  } else {
+    print_tunnel(&tunnel);
+  }
+  Ok(())
+}
+
+fn print_tunnel(tunnel: &ServerTunnel) {
+  let state = match tunnel.state {
+    ServerTunnelState::NotEnabled => "not enabled".dimmed(),
+    ServerTunnelState::Starting => "starting".yellow(),
+    ServerTunnelState::Healthy => "healthy".green(),
+    ServerTunnelState::Degraded => "degraded".yellow(),
+    ServerTunnelState::Down => "down".red(),
+    ServerTunnelState::Inactive => "inactive".yellow(),
+  };
+  println!("{}: {state}", "Tunnel".dimmed());
+  if let Some(name) = &tunnel.tunnel_name {
+    println!("{}: {name}", "Name".dimmed());
+  }
+  if let Some(account) = &tunnel.account {
+    println!("{}: {account}", "Account".dimmed());
+  }
+  if let Some(deployment) = &tunnel.deployment {
+    println!(
+      "{}: {deployment} ({:?})",
+      "Connector".dimmed(),
+      tunnel.deployment_state.unwrap_or_default()
+    );
+  }
+  if tunnel.state == ServerTunnelState::NotEnabled {
+    println!("{}: {}", "Image".dimmed(), tunnel.image);
+  }
+  if !tunnel.domains.is_empty() {
+    println!("{}: {}", "Domains".dimmed(), tunnel.domains.join(", "));
+  }
+  if let Some(warning) = &tunnel.warning {
+    println!("{}: {warning}", "Note".yellow());
   }
 }

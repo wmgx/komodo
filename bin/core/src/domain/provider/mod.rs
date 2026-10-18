@@ -17,7 +17,11 @@ use super::error::ProviderError;
 
 mod cloudflare;
 mod cloudflare_client;
+mod cloudflare_provision;
+mod provision;
 mod tunnel_merge;
+
+pub use provision::{ConnectorSpec, ProvisionProvider, TunnelHandle};
 
 pub type BoxFut<'a, T> =
   Pin<Box<dyn Future<Output = Result<T, ProviderError>> + Send + 'a>>;
@@ -218,6 +222,8 @@ impl fmt::Debug for Credentials {
 pub struct ProviderSet {
   pub dns: Option<Box<dyn DnsProvider>>,
   pub ingress: Option<Box<dyn IngressProvider>>,
+  /// Optional: can open a tunnel by itself.
+  pub provision: Option<Box<dyn ProvisionProvider>>,
 }
 
 pub struct ProviderFactory {

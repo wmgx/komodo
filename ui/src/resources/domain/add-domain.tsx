@@ -24,6 +24,7 @@ import {
   useServicePorts,
   useZones,
 } from "./service-hooks";
+import { EnableTunnelModal } from "./server-tunnel";
 import { reasonText, validatePrefix } from "./text";
 
 export default function AddDomain({ target }: { target: ServiceTarget }) {
@@ -54,6 +55,7 @@ function AddDomainModal({
   const [showAdvanced, { toggle: toggleAdvanced }] = useDisclosure();
   const [conflicts, setConflicts] = useState<Types.Change[]>([]);
   const [problem, setProblem] = useState<string>();
+  const [enableTunnel, setEnableTunnel] = useState(false);
 
   const { zones, accounts, loading, failed } = useZones(true);
   const { serviceNames, ports } = useServicePorts(target, service);
@@ -177,7 +179,13 @@ function AddDomainModal({
             error={portText && !portOk ? "端口应为 1-65535" : undefined}
           />
 
-          <AccessHint hint={hint} mode={mode} hostname={hostname} port={portText} />
+          <AccessHint
+            hint={hint}
+            mode={mode}
+            hostname={hostname}
+            port={portText}
+            onEnableTunnel={() => setEnableTunnel(true)}
+          />
 
           <Button variant="subtle" size="compact-sm" onClick={toggleAdvanced}>
             {showAdvanced ? "收起高级选项" : "高级选项"}
@@ -213,6 +221,15 @@ function AddDomainModal({
           </Group>
         </Stack>
       </Modal>
+
+      {enableTunnel && hint.serverId && (
+        <EnableTunnelModal
+          server={hint.serverId}
+          serverName={hint.serverName}
+          onClose={() => setEnableTunnel(false)}
+          onEnabled={() => setMode(Types.DomainMode.Tunnel)}
+        />
+      )}
 
       <Modal
         opened={!!conflicts.length}
@@ -253,13 +270,20 @@ function AccessHint({
   mode,
   hostname,
   port,
+  onEnableTunnel,
 }: {
   hint: ReturnType<typeof useAccessHint>;
   mode: Types.DomainMode;
   hostname: string;
   port: string;
+  onEnableTunnel: () => void;
 }) {
   const url = hostname ? hostname : "域名";
+  const enableButton = hint.serverId ? (
+    <Button size="compact-xs" variant="light" ml="xs" onClick={onEnableTunnel}>
+      为这台服务器开通隧道
+    </Button>
+  ) : null;
   if (mode !== Types.DomainMode.Dns && hint.tunnel)
     return (
       <Alert color="green" p="xs">
@@ -269,19 +293,22 @@ function AccessHint({
   if (mode === Types.DomainMode.Tunnel)
     return (
       <Alert color="yellow" p="xs">
-        这台服务器还没有隧道。想从外网访问，请先给它开通隧道（即将支持一键开通），或在 Settings -&gt; Domains 里把已有隧道绑定到该服务器。
+        这台服务器还没有隧道。想从外网访问，请先给它开通隧道，或在 Settings -&gt; Domains 里把已有隧道绑定到该服务器。
+        {enableButton}
       </Alert>
     );
   if (hint.lanOnly)
     return (
       <Alert color="yellow" p="xs">
         将解析到内网地址 {hint.host}，只能在局域网访问。想从外网访问，需要先给这台服务器开通隧道。
+        {enableButton}
       </Alert>
     );
   if (hint.unknown)
     return (
       <Alert color="yellow" p="xs">
         这台服务器没有隧道，也没有对外地址。请先在服务器设置里填写 External Address，或给它开通隧道。
+        {enableButton}
       </Alert>
     );
   return (

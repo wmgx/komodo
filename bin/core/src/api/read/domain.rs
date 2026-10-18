@@ -4,6 +4,7 @@ use komodo_client::{
     domain::{Domain, DomainListItem, DomainPlan},
     domain_account::{
       DomainAccount, DomainDiscovery, DomainProviderKind,
+      ServerTunnel,
     },
     permission::PermissionLevel,
   },
@@ -17,6 +18,7 @@ use crate::{
     accounts,
     prepare::plan_domain,
     provider::{REGISTRY, factory},
+    tunnel,
   },
   helpers::query::get_all_tags,
   permission::get_check_permissions,
@@ -248,6 +250,24 @@ impl Resolve<ReadArgs> for DiscoverDomainAccount {
     };
     discover(token).await.map_err(|e| {
       e.log("DiscoverDomainAccount");
+      e.into_api()
+    })
+  }
+}
+
+impl Resolve<ReadArgs> for GetServerTunnel {
+  async fn resolve(
+    self,
+    ReadArgs { user }: &ReadArgs,
+  ) -> mogh_error::Result<ServerTunnel> {
+    if !user.admin {
+      return Err(
+        anyhow::anyhow!("Only admins can read server tunnels")
+          .status_code(StatusCode::FORBIDDEN),
+      );
+    }
+    tunnel::status(&self.server).await.map_err(|e| {
+      e.log("GetServerTunnel");
       e.into_api()
     })
   }

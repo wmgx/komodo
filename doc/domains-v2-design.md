@@ -57,7 +57,7 @@ DomainConfig {
 
 ## 3. 厂商抽象
 
-`bin/core/src/domain/provider/`：`DnsProvider` / `IngressProvider` trait + `ProviderFactory{kind, capabilities, params_example, validate_params, build, discover?}`（`discover` 为可选的只读发现能力，不支持的厂商返回明确错误） + 注册表。`cloudflare.rs` 同时提供两种能力，共用 `cloudflare_client.rs`（25s 超时、禁重定向、仅 GET 重试、不泄露响应体、无 Debug）。`tunnel_merge.rs` 负责「读整条隧道配置 → 合并单个 hostname 规则 → 写回」，保留未知字段与 catch-all。
+`bin/core/src/domain/provider/`：`DnsProvider` / `IngressProvider` trait + `ProviderFactory{kind, capabilities, params_example, validate_params, build, discover?}`（`build` 返回的 `ProviderSet` 里 `dns` / `ingress` / `provision` 都是可选能力）（`discover` 为可选的只读发现能力，不支持的厂商返回明确错误） + 注册表。`cloudflare.rs` 同时提供两种能力，共用 `cloudflare_client.rs`（25s 超时、禁重定向、仅 GET 重试、不泄露响应体、无 Debug）。`tunnel_merge.rs` 负责「读整条隧道配置 → 合并单个 hostname 规则 → 写回」，保留未知字段与 catch-all。
 
 新增厂商：新增 `provider/<kind>.rs` 并在注册表加一行；`ListDomainProviderKinds` 返回 kind、capabilities、params 示例，UI 与 AI 由此发现。
 
@@ -86,8 +86,8 @@ DomainConfig {
 
 | 类别 | 请求 |
 |---|---|
-| Read | `GetDomain` `ListServiceDomains{target}` `ListDomains`（含 status_code）`ListFullDomains` `GetDomainPlan{domain}` `ListDomainProviderKinds` `ListDomainAccounts` `GetDomainAccount` `DiscoverDomainAccount{account?\|(kind,token)?}`（仅管理员，只读，返回 `{zones, ingresses[{id,name,account_id?,status?}], warnings}`；token 不进日志/响应） |
-| Write | `AddServiceDomain{target, service, hostname, port?, mode?, adopt_conflicts}` `CreateDomain` `CopyDomain` `UpdateDomain` `RenameDomain` `DeleteDomain` `CreateDomainAccount{name,kind,token,params,description}` `UpdateDomainAccount{id,token?,params?,description?}` `DeleteDomainAccount{id}` |
+| Read | `GetDomain` `ListServiceDomains{target}` `ListDomains`（含 status_code）`ListFullDomains` `GetDomainPlan{domain}` `ListDomainProviderKinds` `ListDomainAccounts` `GetDomainAccount` `GetServerTunnel{server}`（仅管理员，开通状态 + cloudflared 部署状态 + Cloudflare 侧连接状态） `DiscoverDomainAccount{account?\|(kind,token)?}`（仅管理员，只读，返回 `{zones, ingresses[{id,name,account_id?,status?}], warnings}`；token 不进日志/响应） |
+| Write | `AddServiceDomain{target, service, hostname, port?, mode?, adopt_conflicts}` `CreateDomain` `CopyDomain` `UpdateDomain` `RenameDomain` `DeleteDomain` `CreateDomainAccount{name,kind,token,params,description}` `UpdateDomainAccount{id,token?,params?,description?}` `DeleteDomainAccount{id}` `EnableServerTunnel{server, account?, image?}` `DisableServerTunnel{server, delete_remote?}`（仅管理员，见 6.2） |
 | Execute | `ApplyDomain{domain, plan_id?, adopt_conflicts}`（同时是 Procedure 的 Execution） |
 
 ### 6.1 以服务为中心：AddServiceDomain 与自动推导
@@ -101,7 +101,7 @@ DomainConfig {
 
 1. `mode=Auto|Tunnel` 且目标 Server 在某账号里绑定了隧道（`select(None, server)` 成功）：**Tunnel**。隧道规则 `hostname -> http://localhost:<port>`，**默认假定隧道 agent（cloudflared）以 host 网络运行在该 Server 上**；DNS 为 CNAME 到 `<tunnel_id>.cfargotunnel.com` 且 proxied。多条/多账号匹配报错，不猜。
 2. 否则（`Auto|Dns`）：**DNS**，目标取 Server 的 `external_address`，为空则取 `address` 的 host。IP 用 A / AAAA，域名用 CNAME，不 proxied。私网（10/8、172.16/12、192.168/16、100.64/10、链路本地、IPv6 ULA）返回警告「只能在局域网访问」；回环地址报错。DNS 模式没有端口转发，访问地址是 `http://hostname:port`。
-3. 都无法确定（没有隧道也没有地址、Swarm 目标、没有账号覆盖该 zone）：返回可操作提示。一键开通隧道将在下一批实现，目前提示文案只引导「先开通隧道」。
+3. 都无法确定（没有隧道也没有地址、Swarm 目标、没有账号覆盖该 zone）：返回可操作提示。提示里引导「先给服务器开通隧道」（见 6.2），Add domain 弹窗里有一键开通按钮。
 4. DNS 账号 = 其 zone（`params.zones` 白名单，否则发现结果）覆盖主机名的账号，优先与隧道同账号；只有一个 DNS 账号且 zone 未知时直接用它。多个 DNS 账号时才会联网发现 zone。
 5. 端口：请求未带 `port` 时，Deployment 取 `config.ports` 唯一的宿主端口；Stack 必须由调用方给出（UI 从 `ListStackServices` 的容器端口读取）。
 
@@ -109,16 +109,43 @@ DomainConfig {
 
 UI 的 Add domain 弹窗会在本地复刻「有无隧道 / 是否内网」做提示，真正决策以后端为准。
 
+### 6.2 一键给服务器开通隧道（EnableServerTunnel）
+
+目标：Add domain 时服务器没有隧道，点一下就能让这台服务器上的服务从外网访问。
+
+**厂商抽象**：`ProvisionProvider`（`provider/provision.rs`，`ProviderSet.provision` 可选）。能力：`registered(server)`、`provision(name, image)`（创建隧道 + 初始化配置 + 取 connector token，失败则自动删掉刚创建的隧道）、`connector(handle, image)`（重试用，重新取 token）、`status`、`destroy`、`register / unregister / remember_image`（返回新的账号 params，未知字段保留）。返回的 `ConnectorSpec{image, command, env}` 只描述怎么跑 connector，由 `domain/tunnel.rs` 统一编排 Deployment，core 里没有 Cloudflare 专属逻辑；不支持的厂商得到「账号不支持一键开通隧道」。Cloudflare 实现在 `cloudflare_provision.rs`。
+
+**Enable 流程**（持账号锁，管理员）：
+1. 选账号：服务器已有隧道则用其账号；否则能开通隧道的账号只有一个时自动选用，多个时报错并列出（UI 显示选择框）。账号必须是数据库账号（配置文件账号只读，无法登记隧道）。Cloudflare account_id 不需要填：沿用已登记隧道的 account_id，否则 token 只能看到一个 Cloudflare 账号时自动取，多个时报错。
+2. 已开通且 cloudflared 在运行/部署中：直接返回现状（幂等）。
+3. 服务器状态不是 Ok 时拒绝（还没创建任何远端对象）。
+4. 隧道已登记但 cloudflared 没运行（上次中途失败）：重新取 token，继续第 6 步。
+5. 未登记：`POST cfd_tunnel {name: "komodo-<server>", config_src: "cloudflare"}` -> `PUT configurations`（只有 catch-all `http_status:404`）-> `GET token`；其中任一步失败都会 `DELETE` 刚创建的隧道。然后把 `{name, account_id, tunnel_id, server, managed: true}` 写进账号 `params.tunnels`，同时记下 `params.cloudflared_image`；写库失败同样回滚远端隧道。
+6. 写入 secret Variable，创建（或修正镜像后复用）Deployment `cloudflared-<server>`：镜像可配置（默认 `cloudflare/cloudflared:latest`，镜像源如 `docker.1ms.run/cloudflare/cloudflared:latest`）、`network=host`、`command="tunnel --no-autoupdate run"`、`restart=unless-stopped`、环境变量 `TUNNEL_TOKEN=[[TUNNEL_TOKEN_<SERVER>]]`；通过 `resource::create` 与 `execute::inner_handler(Deploy)` 创建和部署，因此走正常的权限检查并留下 Update 记录。同名但不在这台服务器上的 Deployment 会被拒绝，不会接管。
+
+**Disable 流程**：只允许 `managed` 隧道；仍有 Domain 使用（`ingress.tunnel` 指向它、`info.owned` 的 scope 命中、或 `tunnel` 为空且目标在这台服务器上）时拒绝；先删 Deployment（`resource::delete`，会销毁容器），删 secret Variable，再按选项（默认是）删远端隧道（先 `DELETE connections` 清理残留连接，再 `DELETE cfd_tunnel/{id}`，404 视为已删除），最后从 params 移除登记。远端删除失败时登记保留，可直接重试。
+
+**状态**（`GetServerTunnel`）：`NotEnabled / Starting / Healthy / Degraded / Down / Inactive`。Cloudflare 侧状态来自 `GET cfd_tunnel/{id}`；部署中或 connector 已运行但尚未连上时为 `Starting`；读取失败时 `warning` 说明，不影响其它字段。
+
+**connector token 的存放（取舍）**：
+- 方案 A（采用）：token 存为 secret Variable `TUNNEL_TOKEN_<SERVER>`，Deployment 的 environment 只写 `TUNNEL_TOKEN=[[TUNNEL_TOKEN_<SERVER>]]`，部署时由 Core 插值。有 Read 权限的用户在 Deployment 配置里只看到引用；secret Variable 的值对非管理员不返回，Deploy 日志里会被替换成 `***`。Variable 直接写库，不走 `CreateVariable`，避免值进入 Update 日志。
+- 方案 B（未采用）：每次部署前由 Core 临时注入、不落库。需要改上游 Deploy 流程，侵入大，且重启策略 `unless-stopped` 下容器环境里本来就有 token，收益有限。
+- 残余风险：(1) 有 Variable 写权限或能创建 Deployment 并引用 `[[...]]` 的用户可以通过插值把 token 读出来（例如写到另一个 Deployment 的环境变量或日志）；(2) token 明文在 Mongo 中（与账号 token 同级）；(3) 目标服务器上的 `docker inspect` 能看到 token（任何 connector 部署方式都一样）；(4) token 一旦泄露，持有者可冒充该隧道的 connector，处置方式是在 Cloudflare 删除/重建隧道（Disable 再 Enable）。个人单管理员场景可接受；多人协作时请限制 Variable 与 Deployment 的写权限。
+- 不写进 Deployment 的 `environment` 明文，也不进 Update 日志。
+
+**不做**：多隧道负载均衡、Access 策略、本地配置文件模式。connector 假定以 host 网络和 `localhost:<端口>` 回源（与自动推导一致）。
+
 ## 7. UI 与 CLI
 
 - UI：`ui/src/resources/domain/`（`index` 注册、`config` 配置表单、`plan` Plan 预览与 Apply、`table`）；设置页「Domains」标签管理账号（`ui/src/pages/settings/domain-accounts/`，仅管理员可见）。Plan 需手动点击才会联网；有 Conflict 时必须勾选确认才会带 `adopt_conflicts=true`。
 - 服务页：Stack / Deployment 详情页的「Domains」区块（`ui/src/resources/domain/service-domains.tsx`，经资源的 `Page` 插槽挂载）；删除服务的确认框（`resources/delete.tsx`）会列出绑定域名并可勾选同时删除，不勾选则 Domain 状态显示「目标服务已不存在」（纯 UI 判断）。Domains 列表有 Service 列可跳转。
-- CLI：`km domain add <stack|deployment> <name> <hostname> [--service] [--port] [--mode] [-y]`、`km list domains`、`km domain plan <d> [--json]`、`km domain apply <d> [--plan-id] [--adopt-conflicts] [-y]`、`km domain status <d> [--json]`、`km execute apply-domain`。不提供账号管理命令（token 不应出现在命令行参数）。
+- 开通隧道：Add domain 弹窗在「没有隧道」（含内网地址）的提示旁有「为这台服务器开通隧道」按钮，弹出确认框（镜像带默认值可改，列出会做什么），确认后执行 `EnableServerTunnel` 并显示连接进度，开通成功后弹窗自动切到 Tunnel 模式；Server 详情页的「Cloudflare Tunnel」区块（`server-tunnel.tsx`，经 Server 的 `Page` 插槽挂载，仅管理员）显示状态并提供开通/关闭。
+- CLI：`km domain tunnel enable|disable|status <server> [--account] [--image] [--keep-remote] [-y]`、`km domain add <stack|deployment> <name> <hostname> [--service] [--port] [--mode] [-y]`、`km list domains`、`km domain plan <d> [--json]`、`km domain apply <d> [--plan-id] [--adopt-conflicts] [-y]`、`km domain status <d> [--json]`、`km execute apply-domain`。不提供账号管理命令（token 不应出现在命令行参数）。
 
 ## 8. 已知限制
 
 1. 每个 Domain 只有一条 DNS 记录和一条隧道规则；一个 hostname 要多条记录需多个 Domain 或手工管理。
-2. 仅支持 Cloudflare 远程管理的命名隧道；隧道通过 `DiscoverDomainAccount` 列出后在 UI 勾选，登记到账号 `params.tunnels`。
+2. 仅支持 Cloudflare 远程管理的命名隧道，一对一（一台服务器一条隧道，不做多隧道负载）；隧道通过 `DiscoverDomainAccount` 列出后在 UI 勾选，登记到账号 `params.tunnels`。
 3. apply 超时取消后，隧道规则可能已写入但未记入 `info.owned`，下次 plan 会把它识别为 Conflict，需要 `--adopt-conflicts` 接管。
 4. 账号仍被 Domain 配置或 `info.owned` 引用时无法删除；需先删除 Domain（`Cleanup` 清远端，或把 `on_delete` 改为 `Retain` 保留远端），再删账号。
 5. token 以明文存于 Mongo（与上游 Git/镜像仓库 token 同等安全级别），不做静态加密。

@@ -19,4 +19,5 @@ pub mod prepare;
 pub mod provider;
 pub mod service;
 pub mod store;
+pub mod tunnel;
 pub mod validate;

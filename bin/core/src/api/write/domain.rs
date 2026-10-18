@@ -5,7 +5,7 @@ use komodo_client::{
   entities::{
     Operation, ResourceTarget,
     domain::{Domain, ServiceDomainResult},
-    domain_account::{DomainAccount, DomainAccountDoc},
+    domain_account::{DomainAccount, DomainAccountDoc, ServerTunnel},
     permission::PermissionLevel,
     update::Update,
   },
@@ -20,6 +20,7 @@ use crate::{
     error::DomainError,
     provider::factory,
     service::{AddRequest, add_service_domain},
+    tunnel::{self, EnableRequest},
   },
   helpers::update::{add_update, make_update},
   permission::get_check_permissions,
@@ -68,6 +69,57 @@ impl Resolve<WriteArgs> for AddServiceDomain {
     )
     .await
     .map_err(bad_request)
+  }
+}
+
+impl Resolve<WriteArgs> for EnableServerTunnel {
+  #[instrument(
+    "EnableServerTunnel",
+    skip_all,
+    fields(operator = user.id, server = self.server)
+  )]
+  async fn resolve(
+    self,
+    WriteArgs { user }: &WriteArgs,
+  ) -> mogh_error::Result<ServerTunnel> {
+    require_admin(user, "open server tunnels with")?;
+    tunnel::enable(
+      EnableRequest {
+        server: self.server,
+        account: self.account.filter(|a| !a.is_empty()),
+        image: self.image,
+      },
+      user,
+    )
+    .await
+    .map_err(|e| {
+      e.log("EnableServerTunnel");
+      e.into_api()
+    })
+  }
+}
+
+impl Resolve<WriteArgs> for DisableServerTunnel {
+  #[instrument(
+    "DisableServerTunnel",
+    skip_all,
+    fields(operator = user.id, server = self.server)
+  )]
+  async fn resolve(
+    self,
+    WriteArgs { user }: &WriteArgs,
+  ) -> mogh_error::Result<ServerTunnel> {
+    require_admin(user, "close server tunnels with")?;
+    tunnel::disable(
+      &self.server,
+      self.delete_remote.unwrap_or(true),
+      user,
+    )
+    .await
+    .map_err(|e| {
+      e.log("DisableServerTunnel");
+      e.into_api()
+    })
   }
 }
 

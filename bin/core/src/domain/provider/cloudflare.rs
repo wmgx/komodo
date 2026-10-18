@@ -13,6 +13,8 @@
 //! ```
 //! - `zones` is an optional allow-list (zone names or ids). Empty = any zone the token sees.
 //! - `server` is an optional Komodo Server name or id the tunnel runs on.
+//! - `managed: true` marks tunnels created by Komodo's one-click setup,
+//!   `cloudflared_image` is the connector image used by it (eg. a mirror).
 
 use std::sync::Arc;
 
@@ -30,6 +32,7 @@ use super::{
   IngressProvider, IngressTarget, Owner, ProviderFactory,
   ProviderSet, RemoteRecord, RemoteRule, ServerRef,
   cloudflare_client::{CloudflareClient, Zone, segment},
+  cloudflare_provision::CloudflareProvision,
   dns_canonical, tunnel_merge,
 };
 
@@ -104,17 +107,21 @@ pub(super) async fn discover_with(
 }
 
 #[derive(Default, Clone)]
-struct CloudflareParams {
-  zones: Vec<String>,
-  tunnels: Vec<TunnelEntry>,
+pub(super) struct CloudflareParams {
+  pub(super) zones: Vec<String>,
+  pub(super) tunnels: Vec<TunnelEntry>,
+  /// Connector image remembered from the last one-click tunnel.
+  pub(super) cloudflared_image: Option<String>,
 }
 
 #[derive(Clone)]
-struct TunnelEntry {
-  name: String,
-  account_id: String,
-  tunnel_id: String,
-  server: Option<String>,
+pub(super) struct TunnelEntry {
+  pub(super) name: String,
+  pub(super) account_id: String,
+  pub(super) tunnel_id: String,
+  pub(super) server: Option<String>,
+  /// Created by Komodo's one-click tunnel.
+  pub(super) managed: bool,
 }
 
 /// Required, non-empty string field of tunnel entry `n` (1 based).
@@ -137,7 +144,7 @@ fn tunnel_field(
   }
 }
 
-fn parse_params(
+pub(super) fn parse_params(
   params: &JsonValue,
 ) -> Result<CloudflareParams, ProviderError> {
   if params.is_null() {
@@ -173,7 +180,17 @@ fn parse_params(
         "隧道 #{n} 必须是对象"
       )));
     };
+    let managed = match entry.get("managed") {
+      None | Some(Value::Null) => false,
+      Some(Value::Bool(b)) => *b,
+      Some(_) => {
+        return Err(ProviderError::invalid(format!(
+          "隧道 #{n} 的 managed 必须是布尔值"
+        )));
+      }
+    };
     tunnels.push(TunnelEntry {
+      managed,
       name: tunnel_field(entry, n, "name")?,
       account_id: tunnel_field(entry, n, "account_id")?,
       tunnel_id: tunnel_field(entry, n, "tunnel_id")?,
@@ -189,7 +206,21 @@ fn parse_params(
       },
     });
   }
-  Ok(CloudflareParams { zones, tunnels })
+  let cloudflared_image = match obj.get("cloudflared_image") {
+    None | Some(Value::Null) => None,
+    Some(Value::String(s)) if s.trim().is_empty() => None,
+    Some(Value::String(s)) => Some(s.trim().to_string()),
+    Some(_) => {
+      return Err(ProviderError::invalid(
+        "cloudflared_image 必须是字符串",
+      ));
+    }
+  };
+  Ok(CloudflareParams {
+    zones,
+    tunnels,
+    cloudflared_image,
+  })
 }
 
 fn validate_params(params: &JsonValue) -> Result<(), ProviderError> {
@@ -220,14 +251,17 @@ fn validate_params(params: &JsonValue) -> Result<(), ProviderError> {
 fn build(creds: Credentials) -> Result<ProviderSet, ProviderError> {
   let params = parse_params(&creds.params)?;
   let client = Arc::new(CloudflareClient::new(&creds.token)?);
+  let provision =
+    CloudflareProvision::new(client.clone(), params.clone());
   Ok(ProviderSet {
+    provision: Some(Box::new(provision)),
     dns: Some(Box::new(CloudflareDns {
       client: client.clone(),
       zones: params.zones,
     })),
     ingress: Some(Box::new(CloudflareIngress {
       client,
-      tunnels: params.tunnels,
+      tunnels: params.tunnels.clone(),
     })),
   })
 }
