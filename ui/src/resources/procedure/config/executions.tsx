@@ -1474,6 +1474,29 @@ export const PROCEDURE_EXECUTIONS: ProcedureExecutions = {
     ),
   },
 
+  // Domain
+  ApplyDomain: {
+    params: { domain: "", adopt_conflicts: false },
+    Component: ({ params, setParams, disabled }) => (
+      <Group>
+        <ResourceSelector
+          type="Domain"
+          selected={params.domain}
+          onSelect={(domain) => setParams({ ...params, domain })}
+          disabled={disabled}
+        />
+        <EnableSwitch
+          label="Adopt Conflicts"
+          checked={params.adopt_conflicts}
+          onCheckedChange={(adopt_conflicts) =>
+            setParams({ ...params, adopt_conflicts })
+          }
+          disabled={disabled}
+        />
+      </Group>
+    ),
+  },
+
   Sleep: {
     params: { duration_ms: 0 },
     Component: ({ params, setParams, disabled }) => {

@@ -6,9 +6,9 @@ use komodo_client::{
   KomodoClient,
   api::read::{
     ListActions, ListAlerters, ListBuilders, ListBuilds,
-    ListDeployments, ListProcedures, ListRepos, ListResourceSyncs,
-    ListSchedules, ListServers, ListStacks, ListSwarms, ListTags,
-    ListTerminals,
+    ListDeployments, ListDomains, ListProcedures, ListRepos,
+    ListResourceSyncs, ListSchedules, ListServers, ListStacks,
+    ListSwarms, ListTags, ListTerminals,
   },
   entities::{
     ResourceTargetVariant,
@@ -23,6 +23,7 @@ use komodo_client::{
     deployment::{
       DeploymentListItem, DeploymentListItemInfo, DeploymentState,
     },
+    domain::{DomainListItem, DomainListItemInfo},
     procedure::{
       ProcedureListItem, ProcedureListItemInfo, ProcedureState,
     },
@@ -93,6 +94,10 @@ pub async fn handle(list: &args::list::List) -> anyhow::Result<()> {
     }
     Some(ListCommand::Alerters(filters)) => {
       list_resources::<AlerterListItem>(filters, list.page, false)
+        .await
+    }
+    Some(ListCommand::Domains(filters)) => {
+      list_resources::<DomainListItem>(filters, list.page, false)
         .await
     }
     Some(ListCommand::Terminals(filters)) => {
@@ -926,6 +931,41 @@ impl ListResources for AlerterListItem {
   }
 }
 
+impl ListResources for DomainListItem {
+  type Info = DomainListItemInfo;
+  async fn list(
+    client: &KomodoClient,
+    filters: &ResourceFilters,
+    page: u64,
+    minimal: bool,
+  ) -> anyhow::Result<Vec<Self>> {
+    let names = parse_wildcards(&filters.names);
+    let mut domains = client
+      .read(ListDomains {
+        query: ResourceQuery::builder()
+          .tags(filters.tags.clone())
+          .templates(filters.templates)
+          .build(),
+        page: page.saturating_sub(1),
+        limit: None,
+      })
+      .await?
+      .into_iter()
+      .filter(|domain| {
+        (!minimal || filters.all)
+          && matches_wildcards(&names, &[domain.name.as_str()])
+      })
+      .collect::<Vec<_>>();
+    domains.sort_by(|a, b| {
+      a.info
+        .status_code
+        .cmp(&b.info.status_code)
+        .then(a.name.cmp(&b.name))
+    });
+    Ok(domains)
+  }
+}
+
 // TABLE
 
 impl PrintTable for ResourceListItem<ServerListItemInfo> {
@@ -1313,6 +1353,43 @@ impl PrintTable for ResourceListItem<AlerterListItemInfo> {
       row.push(Cell::new(resource_link(
         &cli_config().host,
         ResourceTargetVariant::Alerter,
+        &self.id,
+      )));
+    }
+    row
+  }
+}
+
+impl PrintTable for ResourceListItem<DomainListItemInfo> {
+  fn header(links: bool) -> &'static [&'static str] {
+    if links {
+      &[
+        "Domain", "Hostname", "DNS", "Ingress", "Status", "Tags",
+        "Link",
+      ]
+    } else {
+      &["Domain", "Hostname", "DNS", "Ingress", "Status", "Tags"]
+    }
+  }
+  fn row(self, links: bool) -> Vec<comfy_table::Cell> {
+    let status = match self.info.status_code.as_str() {
+      "ready" => Cell::new("ready").fg(Color::Green),
+      "drifted" => Cell::new("drifted").fg(Color::Yellow),
+      "error" => Cell::new("error").fg(Color::Red),
+      other => Cell::new(other),
+    };
+    let mut row = vec![
+      Cell::new(self.name).add_attribute(Attribute::Bold),
+      Cell::new(self.info.hostname),
+      Cell::new(self.info.dns_account),
+      Cell::new(self.info.ingress_account),
+      status,
+      Cell::new(self.tags.join(", ")),
+    ];
+    if links {
+      row.push(Cell::new(resource_link(
+        &cli_config().host,
+        ResourceTargetVariant::Domain,
         &self.id,
       )));
     }

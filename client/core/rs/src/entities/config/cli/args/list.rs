@@ -121,6 +121,9 @@ pub enum ListCommand {
   /// List Alerters (aliases: `alerter`, `alrt`)
   #[clap(alias = "alerter", alias = "alrt")]
   Alerters(ResourceFilters),
+  /// List Domains (aliases: `domain`, `dom`)
+  #[clap(alias = "domain", alias = "dom")]
+  Domains(ResourceFilters),
 }
 
 #[derive(Debug, Clone, clap::Parser)]

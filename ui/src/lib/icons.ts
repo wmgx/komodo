@@ -85,6 +85,7 @@ export const ICONS = {
   Resources: LayoutDashboard,
   Action: Clapperboard,
   Alerter: AlarmClock,
+  Domain: Globe,
   Build: Hammer,
   Builder: Factory,
   Deployment: Rocket,

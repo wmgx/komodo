@@ -18,6 +18,7 @@ pub mod container;
 pub mod core_info;
 pub mod create;
 pub mod database;
+pub mod domain;
 pub mod execute;
 pub mod list;
 pub mod terminal;

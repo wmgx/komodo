@@ -346,6 +346,10 @@ function onUpdate(
       );
     }
 
+    if (update.target.type === "Domain") {
+      invalidate(["ListDomains"], ["ListFullDomains"], ["GetDomain"]);
+    }
+
     if (
       update.target.type === "System" &&
       update.operation.includes("Variable")

@@ -7,6 +7,7 @@ use crate::api::execute::Execution;
 pub mod container;
 pub mod create;
 pub mod database;
+pub mod domain;
 pub mod list;
 pub mod terminal;
 pub mod update;
@@ -83,6 +84,13 @@ pub enum Command {
   Update {
     #[command(subcommand)]
     command: update::UpdateCommand,
+  },
+
+  /// Plan / apply / inspect Domains. (alias: `dom`)
+  #[clap(alias = "dom")]
+  Domain {
+    #[command(subcommand)]
+    command: domain::DomainCommand,
   },
 
   /// Container info (aliases: `ps`, `cn`, `containers`)

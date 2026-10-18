@@ -341,6 +341,13 @@ const OPERATIONS_BY_RESOURCE: { [key: string]: Types.Operation[] } = {
     Types.Operation.UpdateAlerter,
     Types.Operation.DeleteAlerter,
   ],
+  Domain: [
+    Types.Operation.CreateDomain,
+    Types.Operation.UpdateDomain,
+    Types.Operation.DeleteDomain,
+    Types.Operation.RenameDomain,
+    Types.Operation.ApplyDomain,
+  ],
   ResourceSync: [
     Types.Operation.CreateResourceSync,
     Types.Operation.UpdateResourceSync,

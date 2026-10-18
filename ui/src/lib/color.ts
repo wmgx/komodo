@@ -563,3 +563,18 @@ export function tagColor(color?: Types.TagColor) {
 //       return "rose-900";
 //   }
 // };
+
+export function domainStatusIntention(code?: string): ColorIntention {
+  switch (code) {
+    case "ready":
+      return "Good";
+    case "drifted":
+      return "Warning";
+    case "error":
+      return "Critical";
+    case "unchecked":
+      return "Unknown";
+    default:
+      return "None";
+  }
+}

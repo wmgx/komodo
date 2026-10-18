@@ -465,6 +465,18 @@ export function useAllResources(
       },
       { refetchInterval, enabled, placeholderData: keepPreviousData },
     ).data,
+    Domain: useRead(
+      "ListDomains",
+      {
+        query: {
+          terms: terms?.filter(
+            (term) => !termMatchesTypeKeyword("domains", term),
+          ),
+        },
+        limit,
+      },
+      { refetchInterval, enabled, placeholderData: keepPreviousData },
+    ).data,
     ResourceSync: useRead(
       "ListResourceSyncs",
       {
@@ -727,6 +739,7 @@ export function usePermissions({ type, id }: Types.ResourceTarget) {
           (!disable_non_admin_create && user?.create_build_permissions)
         : type === "Alerter" ||
             type === "Builder" ||
+            type === "Domain" ||
             type === "Procedure" ||
             type === "Action"
           ? user?.admin
@@ -766,6 +779,7 @@ export type SettingsView =
   | "Builders"
   | "Alerters"
   | "Providers"
+  | "Domains"
   | "Users"
   | "Onboarding";
 
