@@ -67,18 +67,25 @@
         "$ref": "#/definitions/ResourceToml9"
       }
     },
+    "domain": {
+      "description": "Declare a domain",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/ResourceToml10"
+      }
+    },
     "builder": {
       "description": "Declare a builder",
       "type": "array",
       "items": {
-        "$ref": "#/definitions/ResourceToml10"
+        "$ref": "#/definitions/ResourceToml11"
       }
     },
     "resource_sync": {
       "description": "Declare a resource sync",
       "type": "array",
       "items": {
-        "$ref": "#/definitions/ResourceToml11"
+        "$ref": "#/definitions/ResourceToml12"
       }
     },
     "user_group": {
@@ -1022,6 +1029,13 @@
         },
         "server": {
           "description": "The Server to deploy the Deployment on, setting the Deployment into Container mode.\n\nNote. If both swarm_id and server_id are set,\nswarm_id overrides server_id and the Deployment will be in Swarm mode.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "custom_name": {
+          "description": "Specify a custom container / service name,\nif different from Deployment name.",
           "type": [
             "string",
             "null"
@@ -2683,6 +2697,22 @@
           "properties": {
             "type": {
               "type": "string",
+              "const": "ApplyDomain"
+            },
+            "params": {
+              "$ref": "#/definitions/ApplyDomain"
+            }
+          },
+          "required": [
+            "type",
+            "params"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
               "const": "StartContainer"
             },
             "params": {
@@ -3312,6 +3342,14 @@
         "pattern": {
           "description": "Id or name or wildcard pattern or regex.\nSupports multiline and comma delineated combinations of the above.\n\nExample:\n```text\n# match all foo-* stacks\nfoo-*\n# add some more\nextra-stack-1, extra-stack-2\n```",
           "type": "string"
+        },
+        "tags": {
+          "description": "Filter matches by tag.\nIf empty, skips tag filtering.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
         }
       },
       "required": [
@@ -3346,6 +3384,14 @@
         "pattern": {
           "description": "Id or name or wildcard pattern or regex.\nSupports multiline and comma delineated combinations of the above.\n\nExample:\n```text\n# match all foo-* stacks\nfoo-*\n# add some more\nextra-stack-1, extra-stack-2\n```",
           "type": "string"
+        },
+        "tags": {
+          "description": "Filter matches by tag.\nIf empty, skips tag filtering.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
         }
       },
       "required": [
@@ -3380,6 +3426,14 @@
         "pattern": {
           "description": "Id or name or wildcard pattern or regex.\nSupports multiline and comma delineated combinations of the above.\n\nExample:\n```text\n# match all foo-* stacks\nfoo-*\n# add some more\nextra-stack-1, extra-stack-2\n```",
           "type": "string"
+        },
+        "tags": {
+          "description": "Filter matches by tag.\nIf empty, skips tag filtering.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
         }
       },
       "required": [
@@ -3540,6 +3594,14 @@
         "pattern": {
           "description": "Id or name or wildcard pattern or regex.\nSupports multiline and comma delineated combinations of the above.\n\nExample:\n```text\n# match all foo-* stacks\nfoo-*\n# add some more\nextra-stack-1, extra-stack-2\n```",
           "type": "string"
+        },
+        "tags": {
+          "description": "Filter matches by tag.\nIf empty, skips tag filtering.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
         }
       },
       "required": [
@@ -3679,6 +3741,14 @@
         "pattern": {
           "description": "Id or name or wildcard pattern or regex.\nSupports multiline and comma delineated combinations of the above.\n\nExample:\n```text\n# match all foo-* deployments\nfoo-*\n# add some more\nextra-deployment-1, extra-deployment-2\n```",
           "type": "string"
+        },
+        "tags": {
+          "description": "Filter matches by tag.\nIf empty, skips tag filtering.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
         }
       },
       "required": [
@@ -3821,6 +3891,14 @@
         "pattern": {
           "description": "Id or name or wildcard pattern or regex.\nSupports multiline and comma delineated combinations of the above.\n\nExample:\n```text\n# match all foo-* deployments\nfoo-*\n# add some more\nextra-deployment-1, extra-deployment-2\n```",
           "type": "string"
+        },
+        "tags": {
+          "description": "Filter matches by tag.\nIf empty, skips tag filtering.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
         }
       },
       "required": [
@@ -3847,6 +3925,14 @@
         "pattern": {
           "description": "Id or name or wildcard pattern or regex.\nSupports multiline and comma delineated combinations of the above.\n\nExample:\n```text\n# match all foo-* builds\nfoo-*\n# add some more\nextra-build-1, extra-build-2\n```",
           "type": "string"
+        },
+        "tags": {
+          "description": "Filter matches by tag.\nIf empty, skips tag filtering.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
         }
       },
       "required": [
@@ -3886,6 +3972,14 @@
         "pattern": {
           "description": "Id or name or wildcard pattern or regex.\nSupports multiline and comma delineated combinations of the above.\n\nExample:\n```text\n# match all foo-* repos\nfoo-*\n# add some more\nextra-repo-1, extra-repo-2\n```",
           "type": "string"
+        },
+        "tags": {
+          "description": "Filter matches by tag.\nIf empty, skips tag filtering.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
         }
       },
       "required": [
@@ -3912,6 +4006,14 @@
         "pattern": {
           "description": "Id or name or wildcard pattern or regex.\nSupports multiline and comma delineated combinations of the above.\n\nExample:\n```text\n# match all foo-* repos\nfoo-*\n# add some more\nextra-repo-1, extra-repo-2\n```",
           "type": "string"
+        },
+        "tags": {
+          "description": "Filter matches by tag.\nIf empty, skips tag filtering.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
         }
       },
       "required": [
@@ -3938,6 +4040,14 @@
         "pattern": {
           "description": "Id or name or wildcard pattern or regex.\nSupports multiline and comma delineated combinations of the above.\n\nExample:\n```text\n# match all foo-* repos\nfoo-*\n# add some more\nextra-repo-1, extra-repo-2\n```",
           "type": "string"
+        },
+        "tags": {
+          "description": "Filter matches by tag.\nIf empty, skips tag filtering.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
         }
       },
       "required": [
@@ -3977,6 +4087,14 @@
         "pattern": {
           "description": "Id or name or wildcard pattern or regex.\nSupports multiline and comma delineated combinations of the above.\n\nExample:\n```text\n# match all foo-* procedures\nfoo-*\n# add some more\nextra-procedure-1, extra-procedure-2\n```",
           "type": "string"
+        },
+        "tags": {
+          "description": "Filter matches by tag.\nIf empty, skips tag filtering.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
         }
       },
       "required": [
@@ -4031,6 +4149,14 @@
         "pattern": {
           "description": "Id or name or wildcard pattern or regex.\nSupports multiline and comma delineated combinations of the above.\n\nExample:\n```text\n# match all foo-* actions\nfoo-*\n# add some more\nextra-action-1, extra-action-2\n```",
           "type": "string"
+        },
+        "tags": {
+          "description": "Filter matches by tag.\nIf empty, skips tag filtering.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
         }
       },
       "required": [
@@ -4106,6 +4232,7 @@
         "Action",
         "Builder",
         "Alerter",
+        "Domain",
         "ResourceSync"
       ]
     },
@@ -4188,6 +4315,32 @@
           "type": "string",
           "const": "CRITICAL"
         }
+      ]
+    },
+    "ApplyDomain": {
+      "description": "Make the remote DNS record and tunnel ingress rule match the domain config.\nRequires Execute permission. The log of the Update contains the executed\nchanges as JSON. Response: [Update]",
+      "type": "object",
+      "properties": {
+        "domain": {
+          "description": "Id or name",
+          "type": "string"
+        },
+        "plan_id": {
+          "description": "If provided, apply fails with `PlanChanged` when the freshly computed\nplan differs from the one that was reviewed.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "adopt_conflicts": {
+          "description": "Overwrite existing remote objects which Komodo does not own.",
+          "type": "boolean",
+          "default": false
+        }
+      },
+      "required": [
+        "domain"
       ]
     },
     "StartContainer": {
@@ -5637,6 +5790,22 @@
           "properties": {
             "type": {
               "type": "string",
+              "const": "Domain"
+            },
+            "id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
               "const": "ResourceSync"
             },
             "id": {
@@ -5651,6 +5820,190 @@
       ]
     },
     "ResourceToml10": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "description": "The resource name. Required",
+          "type": "string"
+        },
+        "description": {
+          "description": "The resource description. Optional.",
+          "type": "string"
+        },
+        "template": {
+          "description": "Mark resource as a template",
+          "type": "boolean"
+        },
+        "tags": {
+          "description": "Tag ids or names. Optional",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "deploy": {
+          "description": "Optional. Only relevant for deployments / stacks.\n\nWill ensure deployment / stack is running with the latest configuration.\nDeploy actions to achieve this will be included in the sync.\nDefault is false.",
+          "type": "boolean"
+        },
+        "after": {
+          "description": "Optional. Only relevant for deployments / stacks using the 'deploy' sync feature.\n\nSpecify other deployments / stacks by name as dependencies.\nThe sync will ensure the deployment / stack will only be deployed 'after' its dependencies.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "config": {
+          "description": "Resource specific configuration.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/PartialDomainConfig"
+            }
+          ]
+        }
+      },
+      "required": [
+        "name"
+      ]
+    },
+    "PartialDomainConfig": {
+      "type": "object",
+      "properties": {
+        "hostname": {
+          "description": "The full hostname, eg. `app.example.com`. Lowercased on save.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "dns": {
+          "description": "DNS record settings. Leave `account` empty to not manage DNS.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/DnsBinding"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "ingress": {
+          "description": "Tunnel / ingress settings. Leave `account` empty to only manage DNS\n(eg. point the hostname at an IP or another CNAME).",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/IngressBinding"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "on_delete": {
+          "description": "What to do with remote objects created by Komodo when\nthis Domain is deleted. Default: `Cleanup`.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/OnDelete"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "DnsBinding": {
+      "description": "DNS record settings of a Domain.",
+      "type": "object",
+      "properties": {
+        "account": {
+          "description": "Name of the Domain account which manages DNS. Empty = DNS not managed.",
+          "type": "string",
+          "default": ""
+        },
+        "record_type": {
+          "description": "Default: `CNAME`",
+          "default": "CNAME",
+          "allOf": [
+            {
+              "$ref": "#/definitions/DnsRecordType"
+            }
+          ]
+        },
+        "content": {
+          "description": "Record content. If empty, taken from the ingress tunnel\n(eg. `<tunnel-id>.cfargotunnel.com`).",
+          "type": "string",
+          "default": ""
+        },
+        "ttl": {
+          "description": "TTL seconds. 0 / unset = provider automatic.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0,
+          "default": 0
+        },
+        "proxied": {
+          "description": "Whether to proxy through the provider. Unset = provider decides\n(proxied when pointing at a tunnel).",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      }
+    },
+    "DnsRecordType": {
+      "type": "string",
+      "enum": [
+        "A",
+        "AAAA",
+        "CNAME"
+      ]
+    },
+    "IngressBinding": {
+      "description": "Tunnel / ingress settings of a Domain.",
+      "type": "object",
+      "properties": {
+        "account": {
+          "description": "Name of the Domain account which owns the tunnel.\nEmpty = ingress not managed.",
+          "type": "string",
+          "default": ""
+        },
+        "tunnel": {
+          "description": "Name of a tunnel registered on the account.\nIf empty, picked automatically from the Server `target` runs on.",
+          "type": "string",
+          "default": ""
+        },
+        "service": {
+          "description": "Origin service, eg. `http://localhost:8080`.",
+          "type": "string",
+          "default": ""
+        },
+        "target": {
+          "description": "Optional Deployment / Stack. Used to pick the tunnel bound to\nthe Server it runs on when `tunnel` is empty.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ResourceTarget"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "OnDelete": {
+      "oneOf": [
+        {
+          "description": "Remove remote objects created by Komodo. Delete is refused if cleanup fails.",
+          "type": "string",
+          "const": "Cleanup"
+        },
+        {
+          "description": "Leave remote objects untouched.",
+          "type": "string",
+          "const": "Retain"
+        }
+      ]
+    },
+    "ResourceToml11": {
       "type": "object",
       "properties": {
         "name": {
@@ -6004,7 +6357,7 @@
         "accounts"
       ]
     },
-    "ResourceToml11": {
+    "ResourceToml12": {
       "type": "object",
       "properties": {
         "name": {
@@ -6231,6 +6584,9 @@
               "$ref": "#/definitions/PermissionLevelAndSpecifics"
             },
             "Deployment": {
+              "$ref": "#/definitions/PermissionLevelAndSpecifics"
+            },
+            "Domain": {
               "$ref": "#/definitions/PermissionLevelAndSpecifics"
             },
             "Procedure": {

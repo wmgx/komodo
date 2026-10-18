@@ -15,6 +15,7 @@ use komodo_client::{
     build::Build,
     builder::Builder,
     deployment::Deployment,
+    domain::Domain,
     permission::SpecificPermission,
     permission::{
       Permission, PermissionLevel, PermissionLevelAndSpecifics,
@@ -611,6 +612,21 @@ pub async fn user_resource_target_query(
     })
     .unwrap_or_else(|| doc! { "target.type": "Alerter" });
 
+    let domain_query = list_resource_ids_for_user::<Domain>(
+      None,
+      None,
+      None,
+      user,
+      PermissionLevel::Read.into(),
+    )
+    .await?
+    .map(|ids| {
+      doc! {
+        "target.type": "Domain", "target.id": { "$in": ids }
+      }
+    })
+    .unwrap_or_else(|| doc! { "target.type": "Domain" });
+
     let resource_sync_query =
       list_resource_ids_for_user::<ResourceSync>(
         None,
@@ -644,6 +660,7 @@ pub async fn user_resource_target_query(
               action_query,
               builder_query,
               alerter_query,
+              domain_query,
               resource_sync_query,
             ]
           },
@@ -663,6 +680,7 @@ pub async fn user_resource_target_query(
           action_query,
           builder_query,
           alerter_query,
+          domain_query,
           resource_sync_query,
         ]
       }
@@ -746,6 +764,10 @@ pub async fn check_user_target_access(
         required_permissions,
       )
       .await?;
+    }
+    ResourceTarget::Domain(id) => {
+      get_check_permissions::<Domain>(id, user, required_permissions)
+        .await?;
     }
   }
   Ok(())

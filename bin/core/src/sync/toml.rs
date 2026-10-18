@@ -8,6 +8,7 @@ use komodo_client::entities::{
   build::Build,
   builder::{Builder, PartialBuilderConfig},
   deployment::{Deployment, DeploymentImage},
+  domain::Domain,
   procedure::Procedure,
   repo::Repo,
   resource::Resource,
@@ -155,6 +156,7 @@ pub fn convert_resource<R: KomodoResource>(
 impl ToToml for Server {}
 impl ToToml for Action {}
 impl ToToml for Alerter {}
+impl ToToml for Domain {}
 impl ToToml for ResourceSync {}
 
 impl ToToml for Swarm {

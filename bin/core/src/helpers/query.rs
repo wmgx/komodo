@@ -20,6 +20,7 @@ use komodo_client::{
     docker::container::{
       ContainerListItem, ContainerStateStatusEnum,
     },
+    domain::Domain,
     permission::{PermissionLevel, PermissionLevelAndSpecifics},
     procedure::{Procedure, ProcedureState},
     repo::Repo,
@@ -367,6 +368,9 @@ pub async fn get_user_permission_on_target(
     }
     ResourceTarget::Alerter(id) => {
       get_user_permission_on_resource::<Alerter>(user, id).await
+    }
+    ResourceTarget::Domain(id) => {
+      get_user_permission_on_resource::<Domain>(user, id).await
     }
   }
 }

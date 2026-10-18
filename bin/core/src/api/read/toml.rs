@@ -11,7 +11,7 @@ use komodo_client::{
   },
   entities::{
     ResourceTarget, action::Action, alerter::Alerter, build::Build,
-    builder::Builder, deployment::Deployment,
+    builder::Builder, deployment::Deployment, domain::Domain,
     permission::PermissionLevel, procedure::Procedure, repo::Repo,
     resource::ResourceQuery, server::Server, stack::Stack,
     swarm::Swarm, sync::ResourceSync, toml::ResourcesToml,
@@ -71,6 +71,7 @@ async fn get_all_targets(
 
   extend_targets!(
     Alerter,
+    Domain,
     Builder,
     Server,
     Swarm,
@@ -191,6 +192,9 @@ impl Resolve<ReadArgs> for ExportResourcesToToml {
         ResourceTarget::Alerter(id) => {
           convert_target!(id, Alerter, alerters)
         }
+        ResourceTarget::Domain(id) => {
+          convert_target!(id, Domain, domains)
+        }
         ResourceTarget::ResourceSync(id) => {
           let mut sync = get_check_permissions::<ResourceSync>(
             &id,
@@ -293,6 +297,7 @@ fn serialize_resources_toml(
     (Procedure, procedures, "procedure"),
     (Action, actions, "action"),
     (Alerter, alerters, "alerter"),
+    (Domain, domains, "domain"),
     (Builder, builders, "builder"),
     (ResourceSync, resource_syncs, "resource_sync"),
   );

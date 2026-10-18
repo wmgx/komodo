@@ -42,6 +42,7 @@ mod action;
 mod alerter;
 mod build;
 mod deployment;
+mod domain;
 mod maintenance;
 mod procedure;
 mod repo;
@@ -128,6 +129,9 @@ pub enum ExecuteRequest {
   // ==== ALERTER ====
   TestAlerter(TestAlerter),
   SendAlert(SendAlert),
+
+  // ==== DOMAIN ====
+  ApplyDomain(ApplyDomain),
 
   // ==== SERVER ====
   StartContainer(StartContainer),

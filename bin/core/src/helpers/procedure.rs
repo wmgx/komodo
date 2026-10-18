@@ -405,6 +405,9 @@ async fn execute_execution(
     }
     Execution::TestAlerter(req) => resolve_execute!(TestAlerter, req),
     Execution::SendAlert(req) => resolve_execute!(SendAlert, req),
+    Execution::ApplyDomain(req) => {
+      resolve_execute!(ApplyDomain, req)
+    }
     Execution::RemoveSwarmNodes(req) => {
       resolve_execute!(RemoveSwarmNodes, req)
     }
@@ -754,6 +757,7 @@ pub fn replace_procedure_stage_ids_with_names(
         DestroyStack => stack, stacks;
         RunStackService => stack, stacks;
         TestAlerter => alerter, alerters;
+        ApplyDomain => domain, domains;
         RemoveSwarmNodes => swarm, swarms;
         UpdateSwarmNode => swarm, swarms;
         RemoveSwarmStacks => swarm, swarms;

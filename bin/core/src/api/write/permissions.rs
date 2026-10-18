@@ -491,5 +491,19 @@ async fn extract_resource_target_with_validation(
         .id;
       Ok((ResourceTargetVariant::Alerter, id))
     }
+    ResourceTarget::Domain(ident) => {
+      let filter = match ObjectId::from_str(ident) {
+        Ok(id) => doc! { "_id": id },
+        Err(_) => doc! { "name": ident },
+      };
+      let id = db_client()
+        .domains
+        .find_one(filter)
+        .await
+        .context("Failed to query db for domains")?
+        .context("No matching domain found")?
+        .id;
+      Ok((ResourceTargetVariant::Domain, id))
+    }
   }
 }

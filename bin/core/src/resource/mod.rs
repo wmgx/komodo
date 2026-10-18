@@ -59,6 +59,7 @@ mod alerter;
 mod build;
 mod builder;
 mod deployment;
+mod domain;
 mod procedure;
 mod refresh;
 mod repo;
@@ -840,6 +841,7 @@ fn resource_target<T: KomodoResource>(id: String) -> ResourceTarget {
     }
     ResourceTargetVariant::Builder => ResourceTarget::Builder(id),
     ResourceTargetVariant::Alerter => ResourceTarget::Alerter(id),
+    ResourceTargetVariant::Domain => ResourceTarget::Domain(id),
   }
 }
 
@@ -1135,6 +1137,7 @@ where
     ResourceTarget::ResourceSync(id) => ("recents.ResourceSync", id),
     ResourceTarget::Builder(id) => ("recents.Builder", id),
     ResourceTarget::Alerter(id) => ("recents.Alerter", id),
+    ResourceTarget::Domain(id) => ("recents.Domain", id),
     ResourceTarget::System(_) => return,
   };
   if let Err(e) = db_client()

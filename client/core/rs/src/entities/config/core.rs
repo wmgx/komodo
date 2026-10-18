@@ -24,6 +24,7 @@ use crate::{
 };
 
 use super::{GitProvider, ImageRegistry, empty_or_redacted};
+use crate::entities::domain_account::DomainAccountConfig;
 
 /// # Komodo Core Environment Variables
 ///
@@ -750,6 +751,19 @@ pub struct CoreConfig {
   )]
   pub image_registries: Vec<ImageRegistry>,
 
+  // ====================
+  // = Domain Providers =
+  // ====================
+  /// Configure domain provider accounts (eg. Cloudflare). Database accounts
+  /// with the same name take priority. Tokens here are NOT part of `secrets`
+  /// and cannot be interpolated into resources.
+  #[serde(
+    default,
+    alias = "domain_account",
+    skip_serializing_if = "Vec::is_empty"
+  )]
+  pub domain_accounts: Vec<DomainAccountConfig>,
+
   // ===========
   // = Secrets =
   // ===========
@@ -997,6 +1011,7 @@ impl Default for CoreConfig {
       aws: Default::default(),
       git_providers: Default::default(),
       image_registries: Default::default(),
+      domain_accounts: Default::default(),
       secrets: Default::default(),
       ssl_enabled: Default::default(),
       ssl_key_file: default_ssl_key_file(),
@@ -1138,6 +1153,11 @@ impl CoreConfig {
           });
           provider
         })
+        .collect(),
+      domain_accounts: config
+        .domain_accounts
+        .iter()
+        .map(DomainAccountConfig::sanitized)
         .collect(),
       ssl_enabled: config.ssl_enabled,
       ssl_key_file: config.ssl_key_file,

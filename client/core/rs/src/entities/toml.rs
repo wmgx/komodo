@@ -11,6 +11,7 @@ use super::{
   build::_PartialBuildConfig,
   builder::_PartialBuilderConfig,
   deployment::_PartialDeploymentConfig,
+  domain::_PartialDomainConfig,
   permission::{
     PermissionLevel, PermissionLevelAndSpecifics, SpecificPermission,
   },
@@ -109,6 +110,15 @@ pub struct ResourcesToml {
   )]
   #[cfg_attr(feature = "schemars", schemars(rename = "alerter"))]
   pub alerters: Vec<ResourceToml<_PartialAlerterConfig>>,
+
+  /// Declare a domain
+  #[serde(
+    default,
+    alias = "domain",
+    skip_serializing_if = "Vec::is_empty"
+  )]
+  #[cfg_attr(feature = "schemars", schemars(rename = "domain"))]
+  pub domains: Vec<ResourceToml<_PartialDomainConfig>>,
 
   /// Declare a builder
   #[serde(

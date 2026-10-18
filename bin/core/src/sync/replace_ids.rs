@@ -4,6 +4,7 @@ use komodo_client::entities::{
   build::Build,
   builder::{Builder, BuilderConfig},
   deployment::{Deployment, DeploymentImage},
+  domain::Domain,
   procedure::Procedure,
   repo::Repo,
   server::Server,
@@ -230,6 +231,7 @@ impl ReplaceIds for Alerter {
         Action => actions,
         Builder => builders,
         Alerter => alerters,
+        Domain => domains,
         ResourceSync => syncs,
       });
     }
@@ -245,6 +247,29 @@ impl ReplaceIds for Alerter {
         Action => actions,
         Builder => builders,
         Alerter => alerters,
+        Domain => domains,
+        ResourceSync => syncs,
+      });
+    }
+  }
+}
+
+impl ReplaceIds for Domain {
+  fn replace_ids(config: &mut Self::Config) {
+    if let Some(target) = &mut config.ingress.target {
+      let all = all_resources_cache().load();
+      replace_resource_target_ids!(target, all, {
+        Swarm => swarms,
+        Server => servers,
+        Stack => stacks,
+        Deployment => deployments,
+        Build => builds,
+        Repo => repos,
+        Procedure => procedures,
+        Action => actions,
+        Builder => builders,
+        Alerter => alerters,
+        Domain => domains,
         ResourceSync => syncs,
       });
     }

@@ -11,6 +11,7 @@ use komodo_client::entities::{
   alerter::Alerter,
   build::Build,
   deployment::Deployment,
+  domain::Domain,
   komodo_timestamp,
   procedure::Procedure,
   repo::Repo,
@@ -236,6 +237,8 @@ pub async fn init_execution_update(
       (RunStackService, Stack, stack),
       // Alerter
       (TestAlerter, Alerter, alerter),
+      // Domain
+      (ApplyDomain, Domain, domain),
     ],
     batch: [
       BatchDeploy,

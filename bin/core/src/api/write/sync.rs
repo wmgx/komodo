@@ -20,6 +20,7 @@ use komodo_client::{
     build::Build,
     builder::Builder,
     deployment::Deployment,
+    domain::Domain,
     komodo_timestamp,
     permission::PermissionLevel,
     procedure::Procedure,
@@ -813,6 +814,7 @@ impl Resolve<WriteArgs> for RefreshResourceSyncPending {
             (Action, actions),
             (Builder, builders),
             (Alerter, alerters),
+            (Domain, domains),
             (ResourceSync, resource_syncs),
           );
 

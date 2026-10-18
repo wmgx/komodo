@@ -8,6 +8,7 @@ mod action;
 mod alerter;
 mod build;
 mod deployment;
+mod domain;
 mod maintenance;
 mod procedure;
 mod repo;
@@ -20,6 +21,7 @@ pub use action::*;
 pub use alerter::*;
 pub use build::*;
 pub use deployment::*;
+pub use domain::*;
 pub use maintenance::*;
 pub use procedure::*;
 pub use repo::*;
@@ -160,6 +162,9 @@ pub enum Execution {
   TestAlerter(TestAlerter),
   #[clap(alias = "alert")]
   SendAlert(SendAlert),
+
+  // DOMAIN
+  ApplyDomain(ApplyDomain),
 
   // SERVER
   StartContainer(StartContainer),

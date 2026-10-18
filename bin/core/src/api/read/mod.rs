@@ -45,6 +45,7 @@ mod build;
 mod builder;
 mod deployment;
 mod docker;
+mod domain;
 mod onboarding_key;
 mod permission;
 mod procedure;
@@ -240,6 +241,15 @@ enum ReadRequest {
   GetAlerter(GetAlerter),
   ListAlerters(ListAlerters),
   ListFullAlerters(ListFullAlerters),
+
+  // ==== DOMAIN ====
+  GetDomain(GetDomain),
+  ListDomains(ListDomains),
+  ListFullDomains(ListFullDomains),
+  GetDomainPlan(GetDomainPlan),
+  ListDomainProviderKinds(ListDomainProviderKinds),
+  ListDomainAccounts(ListDomainAccounts),
+  GetDomainAccount(GetDomainAccount),
 
   // ==== TOML ====
   ExportAllResourcesToToml(ExportAllResourcesToToml),

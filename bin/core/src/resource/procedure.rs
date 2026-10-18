@@ -14,6 +14,7 @@ use komodo_client::{
     alerter::Alerter,
     build::Build,
     deployment::Deployment,
+    domain::Domain,
     permission::PermissionLevel,
     procedure::{
       PartialProcedureConfig, Procedure, ProcedureConfig,
@@ -329,6 +330,8 @@ async fn validate_config(
           (RunStackService, Stack, stack),
           // Alerter
           (TestAlerter, Alerter, alerter),
+          // Domain
+          (ApplyDomain, Domain, domain),
           // Swarm
           (RemoveSwarmNodes, Swarm, swarm),
           (UpdateSwarmNode, Swarm, swarm),

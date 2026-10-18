@@ -261,6 +261,7 @@ pub fn extend_resources(
     procedures,
     actions,
     alerters,
+    domains,
     builders,
     resource_syncs,
   );

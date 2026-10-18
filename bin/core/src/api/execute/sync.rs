@@ -15,6 +15,7 @@ use komodo_client::{
     build::Build,
     builder::Builder,
     deployment::Deployment,
+    domain::Domain,
     komodo_timestamp,
     permission::PermissionLevel,
     procedure::Procedure,
@@ -168,6 +169,7 @@ impl Resolve<ExecuteArgs> for RunSync {
             (ResourceSync, syncs),
             (Builder, builders),
             (Alerter, alerters),
+            (Domain, domains),
           )
         })
         .collect::<Vec<_>>()
@@ -247,6 +249,7 @@ impl Resolve<ExecuteArgs> for RunSync {
       (action_deltas, Action, actions),
       (builder_deltas, Builder, builders),
       (alerter_deltas, Alerter, alerters),
+      (domain_deltas, Domain, domains),
       (resource_sync_deltas, ResourceSync, resource_syncs),
     );
 
@@ -293,6 +296,7 @@ impl Resolve<ExecuteArgs> for RunSync {
       && build_deltas.no_changes()
       && builder_deltas.no_changes()
       && alerter_deltas.no_changes()
+      && domain_deltas.no_changes()
       && repo_deltas.no_changes()
       && procedure_deltas.no_changes()
       && action_deltas.no_changes()
@@ -352,6 +356,10 @@ impl Resolve<ExecuteArgs> for RunSync {
     maybe_extend(
       &mut update.logs,
       Alerter::execute_sync_updates(alerter_deltas).await,
+    );
+    maybe_extend(
+      &mut update.logs,
+      Domain::execute_sync_updates(domain_deltas).await,
     );
     maybe_extend(
       &mut update.logs,

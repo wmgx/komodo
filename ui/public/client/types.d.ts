@@ -270,6 +270,9 @@ export type ResourceTarget = {
     type: "Alerter";
     id: string;
 } | {
+    type: "Domain";
+    id: string;
+} | {
     type: "ResourceSync";
     id: string;
 };
@@ -515,6 +518,14 @@ export declare enum Operation {
     DeleteAlerter = "DeleteAlerter",
     TestAlerter = "TestAlerter",
     SendAlert = "SendAlert",
+    CreateDomain = "CreateDomain",
+    UpdateDomain = "UpdateDomain",
+    RenameDomain = "RenameDomain",
+    DeleteDomain = "DeleteDomain",
+    ApplyDomain = "ApplyDomain",
+    CreateDomainAccount = "CreateDomainAccount",
+    UpdateDomainAccount = "UpdateDomainAccount",
+    DeleteDomainAccount = "DeleteDomainAccount",
     ClearRepoCache = "ClearRepoCache",
     BackupCoreDatabase = "BackupCoreDatabase",
     GlobalAutoUpdate = "GlobalAutoUpdate",
@@ -1029,6 +1040,9 @@ export type Execution =
     type: "SendAlert";
     params: SendAlert;
 } | {
+    type: "ApplyDomain";
+    params: ApplyDomain;
+} | {
     type: "StartContainer";
     params: StartContainer;
 } | {
@@ -1219,6 +1233,30 @@ export interface CreateApiKeyResponse {
     secret: string;
 }
 export type CreateApiKeyForServiceUserResponse = CreateApiKeyResponse;
+export type JsonValue = any;
+export declare enum DomainAccountSource {
+    Database = "Database",
+    /** Declared in Core config, read only. */
+    Config = "Config"
+}
+export declare enum DomainLayer {
+    Dns = "Dns",
+    Ingress = "Ingress"
+}
+/** Redacted account view returned by the API. Never contains the token. */
+export interface DomainAccount {
+    /** Empty for config accounts. */
+    id: string;
+    name: string;
+    kind: string;
+    params: JsonValue;
+    description: string;
+    token_set: boolean;
+    source: DomainAccountSource;
+    /** What this account kind can do. */
+    capabilities: DomainLayer[];
+}
+export type CreateDomainAccountResponse = DomainAccount;
 /**
  * Configuration to access private git repos from various git providers.
  * Note. Cannot create two accounts with the same domain and username.
@@ -1321,7 +1359,6 @@ export interface UserTotpConfig {
     /** Hashed recovery codes. */
     recovery_codes: string[];
 }
-export type JsonValue = any;
 export interface UserPasskeyConfig {
     /** Passkey config for 2fa. The exact schema is not public. */
     passkey?: JsonValue;
@@ -1397,6 +1434,7 @@ export interface Variable {
 }
 export type CreateVariableResponse = Variable;
 export type DeleteApiKeyForServiceUserResponse = NoData;
+export type DeleteDomainAccountResponse = DomainAccount;
 export type DeleteGitProviderAccountResponse = GitProviderAccount;
 export type DeleteImageRegistryAccountResponse = ImageRegistryAccount;
 /**
@@ -1690,6 +1728,136 @@ export interface DeploymentQuerySpecifics {
     states?: DeploymentState[];
 }
 export type DeploymentQuery = ResourceQuery<DeploymentQuerySpecifics>;
+export declare enum DnsRecordType {
+    A = "A",
+    AAAA = "AAAA",
+    CNAME = "CNAME"
+}
+/** DNS record settings of a Domain. */
+export interface DnsBinding {
+    /** Name of the Domain account which manages DNS. Empty = DNS not managed. */
+    account?: string;
+    /** Default: `CNAME` */
+    record_type?: DnsRecordType;
+    /**
+     * Record content. If empty, taken from the ingress tunnel
+     * (eg. `<tunnel-id>.cfargotunnel.com`).
+     */
+    content?: string;
+    /** TTL seconds. 0 / unset = provider automatic. */
+    ttl?: number;
+    /**
+     * Whether to proxy through the provider. Unset = provider decides
+     * (proxied when pointing at a tunnel).
+     */
+    proxied?: boolean;
+}
+/** Tunnel / ingress settings of a Domain. */
+export interface IngressBinding {
+    /**
+     * Name of the Domain account which owns the tunnel.
+     * Empty = ingress not managed.
+     */
+    account?: string;
+    /**
+     * Name of a tunnel registered on the account.
+     * If empty, picked automatically from the Server `target` runs on.
+     */
+    tunnel?: string;
+    /** Origin service, eg. `http://localhost:8080`. */
+    service?: string;
+    /**
+     * Optional Deployment / Stack. Used to pick the tunnel bound to
+     * the Server it runs on when `tunnel` is empty.
+     */
+    target?: ResourceTarget;
+}
+export declare enum OnDelete {
+    /** Remove remote objects created by Komodo. Delete is refused if cleanup fails. */
+    Cleanup = "Cleanup",
+    /** Leave remote objects untouched. */
+    Retain = "Retain"
+}
+/**
+ * Declares how a public hostname reaches a service:
+ * one DNS record and / or one tunnel ingress rule.
+ *
+ * DNS zone is auto-detected from the account (longest suffix match).
+ */
+export interface DomainConfig {
+    /** The full hostname, eg. `app.example.com`. Lowercased on save. */
+    hostname?: string;
+    /** DNS record settings. Leave `account` empty to not manage DNS. */
+    dns?: DnsBinding;
+    /**
+     * Tunnel / ingress settings. Leave `account` empty to only manage DNS
+     * (eg. point the hostname at an IP or another CNAME).
+     */
+    ingress?: IngressBinding;
+    /**
+     * What to do with remote objects created by Komodo when
+     * this Domain is deleted. Default: `Cleanup`.
+     */
+    on_delete?: OnDelete;
+}
+export type DomainStatus = {
+    type: "Ready";
+    data?: undefined;
+} | {
+    type: "Drifted";
+    data: {
+        reasons: DomainReason[];
+    };
+} | {
+    type: "Error";
+    data: {
+        reason: DomainReason;
+    };
+};
+/** A remote object Komodo created. Drift and cleanup only consider these. */
+export interface OwnedObject {
+    layer: DomainLayer;
+    /** The Domain account name used to create it. */
+    account: string;
+    /** Hostname the object serves. */
+    key: string;
+    /** Provider object id (DNS record id; empty for tunnel rules). */
+    remote_id: string;
+    /** Opaque provider container (zone id / tunnel id). Needed for cleanup. */
+    scope: string;
+    /** Digest of the user controlled fields as last written by Komodo. */
+    applied_digest: string;
+}
+/** System maintained state, not user configurable. */
+export interface DomainInfo {
+    /** Last observed status. `None` = never checked. */
+    status?: DomainStatus;
+    /** When status was last observed (ms). */
+    observed_at?: I64;
+    /** Remote objects created and claimed by Komodo. */
+    owned?: OwnedObject[];
+}
+export type Domain = Resource<DomainConfig, DomainInfo>;
+export interface DomainListItemInfo {
+    /** The full hostname, eg. `app.example.com` */
+    hostname: string;
+    /** Name of the account managing DNS. Empty if DNS is not managed. */
+    dns_account: string;
+    /**
+     * Name of the account managing the tunnel / ingress rule.
+     * Empty if ingress is not managed.
+     */
+    ingress_account: string;
+    /**
+     * `ready` | `drifted` | `error` | `unchecked`.
+     * Cached from the last plan / apply, listing never calls the provider.
+     */
+    status_code: string;
+}
+export type DomainListItem = ResourceListItem<DomainListItemInfo>;
+export interface DomainQuerySpecifics {
+}
+export type DomainQuery = ResourceQuery<DomainQuerySpecifics>;
 /** Response containing pretty formatted toml contents. */
 export interface TomlResponse {
     toml: string;
@@ -2119,6 +2287,74 @@ export interface ContainerStats {
     pids: string;
 }
 export type GetDeploymentStatsResponse = ContainerStats;
+export type GetDomainAccountResponse = DomainAccount;
+export interface ObjectRef {
+    /** `dns_record` | `tunnel_rule` */
+    kind: string;
+    /** The hostname */
+    key: string;
+    remote_id?: string;
+}
+export declare enum ChangeAction {
+    Create = "Create",
+    Update = "Update",
+    Delete = "Delete",
+    Noop = "Noop",
+    /**
+     * Remote object exists but is not owned by Komodo.
+     * Apply refuses unless `adopt_conflicts` is set.
+     */
+    Conflict = "Conflict"
+}
+export declare enum ChangeReason {
+    Missing = "Missing",
+    ContentDiffers = "ContentDiffers",
+    /** Object created by Komodo was edited remotely. */
+    ManualEdit = "ManualEdit",
+    NotOwned = "NotOwned",
+    HostnameChanged = "HostnameChanged",
+    /** Owned object no longer declared by the config. */
+    OrphanOwned = "OrphanOwned"
+}
+export interface Change {
+    layer: DomainLayer;
+    object: ObjectRef;
+    action: ChangeAction;
+    /** Normalized current remote content */
+    before?: JsonValue;
+    /** Normalized desired content */
+    after?: JsonValue;
+    reason?: ChangeReason;
+}
+/**
+ * A machine readable problem. `code` is stable.
+ *
+ * Codes: `AccountNotFound` `AccountKindMismatch` `InvalidConfig`
+ * `ZoneNotFound` `TunnelNotFound` `TunnelAmbiguous` `AuthFailed`
+ * `RateLimited` `ProviderUnavailable` `ProviderRejected`
+ * `ProviderResponse` `Timeout` `RecordMissing` `RecordChanged`
+ * `RuleMissing` `RuleChanged` `ForeignRecordConflict` `PlanChanged`
+ */
+export interface DomainReason {
+    code: string;
+    layer?: DomainLayer;
+    object_key?: string;
+    /** Human readable summary. Never contains tokens or provider response bodies. */
+    message: string;
+    retryable: boolean;
+}
+export interface DomainPlan {
+    /** Domain id */
+    domain: string;
+    generated_at: I64;
+    /** Digest of `changes`. Pass to ApplyDomain to ensure what is applied is what was reviewed. */
+    plan_id: string;
+    changes: Change[];
+    /** Problems which prevent computing / applying the plan. */
+    errors: DomainReason[];
+}
+export type GetDomainPlanResponse = DomainPlan;
+export type GetDomainResponse = Domain;
 export type GetGitProviderAccountResponse = GitProviderAccount;
 export type GetImageRegistryAccountResponse = ImageRegistryAccount;
 export declare enum Timelength {
@@ -5091,11 +5327,22 @@ export interface ComposeProject {
 export type ListComposeProjectsResponse = ComposeProject[];
 export type ListContainersResponse = ContainerListItem[];
 export type ListDeploymentsResponse = DeploymentListItem[];
+export type ListDomainAccountsResponse = DomainAccount[];
+/** An available provider kind. */
+export interface DomainProviderKind {
+    kind: string;
+    capabilities: DomainLayer[];
+    /** Example `params` for accounts of this kind. */
+    params_example: JsonValue;
+}
+export type ListDomainProviderKindsResponse = DomainProviderKind[];
+export type ListDomainsResponse = DomainListItem[];
 export type ListFullActionsResponse = Action[];
 export type ListFullAlertersResponse = Alerter[];
 export type ListFullBuildersResponse = Builder[];
 export type ListFullBuildsResponse = Build[];
 export type ListFullDeploymentsResponse = Deployment[];
+export type ListFullDomainsResponse = Domain[];
 export type ListFullProceduresResponse = Procedure[];
 export type ListFullReposResponse = Repo[];
 export type ListFullResourceSyncsResponse = ResourceSync[];
@@ -5846,6 +6093,7 @@ export interface SwarmQuerySpecifics {
     servers: string[];
 }
 export type SwarmQuery = ResourceQuery<SwarmQuerySpecifics>;
+export type UpdateDomainAccountResponse = DomainAccount;
 export type UpdateGitProviderAccountResponse = GitProviderAccount;
 export type UpdateImageRegistryAccountResponse = ImageRegistryAccount;
 export type UpdateOnboardingKeyResponse = OnboardingKey;
@@ -5865,6 +6113,7 @@ export type _PartialAwsBuilderConfig = Partial<AwsBuilderConfig>;
 export type _PartialBuildConfig = Partial<BuildConfig>;
 export type _PartialBuilderConfig = Partial<BuilderConfig>;
 export type _PartialDeploymentConfig = Partial<DeploymentConfig>;
+export type _PartialDomainConfig = Partial<DomainConfig>;
 export type _PartialGitProviderAccount = Partial<GitProviderAccount>;
 export type _PartialImageRegistryAccount = Partial<ImageRegistryAccount>;
 export type _PartialProcedureConfig = Partial<ProcedureConfig>;
@@ -5882,6 +6131,22 @@ export interface AddUserToUserGroup {
     user_group: string;
     /** The id or username of the user to add */
     user: string;
+}
+/**
+ * Make the remote DNS record and tunnel ingress rule match the domain config.
+ * Requires Execute permission. The log of the Update contains the executed
+ * changes as JSON. Response: [Update]
+ */
+export interface ApplyDomain {
+    /** Id or name */
+    domain: string;
+    /**
+     * If provided, apply fails with `PlanChanged` when the freshly computed
+     * plan differs from the one that was reviewed.
+     */
+    plan_id?: string;
+    /** Overwrite existing remote objects which Komodo does not own. */
+    adopt_conflicts?: boolean;
 }
 /** Configuration for an AWS builder. */
 export interface AwsBuilderConfig {
@@ -6744,6 +7009,16 @@ export interface CopyDeployment {
     id: string;
 }
 /**
+ * Creates a new domain with given `name` and the configuration
+ * of the domain at the given `id`. Response: [Domain].
+ */
+export interface CopyDomain {
+    /** The name of the new domain. */
+    name: string;
+    /** The id of the domain to copy. */
+    id: string;
+}
+/**
  * Creates a new procedure with given `name` and the configuration
  * of the procedure at the given `id`. Response: [Procedure].
  */
@@ -6872,6 +7147,29 @@ export interface CreateDeploymentFromContainer {
     name: string;
     /** The server id or name on which container exists. */
     server: string;
+}
+/** Create a domain. Response: [Domain]. */
+export interface CreateDomain {
+    /** The name given to newly created domain. */
+    name: string;
+    /** Optional partial config to initialize the domain with. */
+    config?: _PartialDomainConfig;
+}
+/**
+ * **Admin only.** Create a domain provider account. The token is stored
+ * in plain text on the database (same as git provider tokens) and is
+ * never returned. Response: [DomainAccount].
+ */
+export interface CreateDomainAccount {
+    /** Globally unique. Domains reference the account by this name. */
+    name: string;
+    /** Provider kind, eg. `cloudflare`. See ListDomainProviderKinds. */
+    kind: string;
+    /** The provider API token. */
+    token: string;
+    /** Non-secret provider params. See ListDomainProviderKinds for an example. */
+    params?: JsonValue;
+    description?: string;
 }
 /**
  * **Admin only.** Create a git provider account.
@@ -7173,6 +7471,25 @@ export interface DeleteDeployment {
     id: string;
 }
 /**
+ * Deletes the domain at the given id, and returns the deleted domain.
+ * With `on_delete: Cleanup` (default) remote objects created by Komodo are
+ * removed first, and the delete is refused if that fails.
+ * Set `on_delete: Retain` on the domain config to keep remote objects.
+ * Response: [Domain]
+ */
+export interface DeleteDomain {
+    /** The id or name of the domain to delete. */
+    id: string;
+}
+/**
+ * **Admin only.** Delete a database domain account.
+ * Refused while any Domain references it. Response: [DomainAccount].
+ */
+export interface DeleteDomainAccount {
+    /** Id or name */
+    id: string;
+}
+/**
  * **Admin only.** Delete a git provider account.
  * Response: [DeleteGitProviderAccountResponse].
  */
@@ -7427,6 +7744,18 @@ export interface DockerLists {
     volumes: VolumeListItem[];
     projects: ComposeProject[];
 }
+/**
+ * Account declared in the Core config (`[[domain_account]]`).
+ * Database accounts take priority over config ones with the same name.
+ * This is NOT part of core `secrets`, so it is never interpolated.
+ */
+export interface DomainAccountConfig {
+    name: string;
+    kind: string;
+    token?: string;
+    params?: JsonValue;
+    description?: string;
+}
 export interface EnvironmentVar {
     variable: string;
     value: string;
@@ -7527,6 +7856,8 @@ export interface ResourcesToml {
     actions?: ResourceToml<_PartialActionConfig>[];
     /** Declare an alerter */
     alerters?: ResourceToml<_PartialAlerterConfig>[];
+    /** Declare a domain */
+    domains?: ResourceToml<_PartialDomainConfig>[];
     /** Declare a builder */
     builders?: ResourceToml<_PartialBuilderConfig>[];
     /** Declare a resource sync */
@@ -7902,6 +8233,29 @@ export interface GetDeploymentsSummaryResponse {
     unhealthy: I64;
     /** The number of Deployments with Unknown state */
     unknown: I64;
+}
+/** Get a specific domain. Response: [Domain]. */
+export interface GetDomain {
+    /** Id or name */
+    domain: string;
+}
+/**
+ * Get a domain account by id or name, without the token.
+ * Admin only. Response: [DomainAccount].
+ */
+export interface GetDomainAccount {
+    /** Id or name */
+    account: string;
+}
+/**
+ * Compute the changes needed to make the remote DNS / tunnel match the
+ * domain config. Contacts the providers, but never writes. Requires Read permission.
+ * Also refreshes the cached status of the domain.
+ * Response: [DomainPlan].
+ */
+export interface GetDomainPlan {
+    /** Id or name */
+    domain: string;
 }
 /**
  * Get a specific git provider account.
@@ -8919,6 +9273,30 @@ export interface ListDeployments {
     /** Reverse the sort direction. */
     sort_desc?: boolean;
 }
+/**
+ * List domain accounts (database + core config), without tokens.
+ * Admin only. Response: [ListDomainAccountsResponse].
+ */
+export interface ListDomainAccounts {
+}
+/**
+ * List the available domain provider kinds, their capabilities
+ * and example account `params`. Response: [ListDomainProviderKindsResponse].
+ */
+export interface ListDomainProviderKinds {
+}
+/** List domains matching optional query. Response: [ListDomainsResponse]. */
+export interface ListDomains {
+    /** Structured query to filter domains. */
+    query?: DomainQuery;
+    /** Retrieve more results by incrementing the page. */
+    page?: U64;
+    /**
+     * Limit per page. Defaults to Core config `default_pagination_limit`.
+     * `limit: 0` returns all results.
+     */
+    limit?: U64;
+}
 /** List actions matching optional query. Response: [ListFullActionsResponse]. */
 export interface ListFullActions {
     /** optional structured query to filter actions. */
@@ -9024,6 +9402,13 @@ export interface ListFullDeployments {
      * Note: the page logic relies on this being consistent
      * across queries for more pages.
      */
+    limit?: U64;
+}
+/** List full domains matching optional query. Response: [ListFullDomainsResponse]. */
+export interface ListFullDomains {
+    /** Structured query to filter domains. */
+    query?: DomainQuery;
+    page?: U64;
     limit?: U64;
 }
 /** List procedures matching optional query. Response: [ListFullProceduresResponse]. */
@@ -10087,6 +10472,13 @@ export interface RenameDeployment {
     /** The new name. */
     name: string;
 }
+/** Rename the Domain at id to the given name. Response: [Update]. */
+export interface RenameDomain {
+    /** The id or name of the Domain to rename. */
+    id: string;
+    /** The new name. */
+    name: string;
+}
 /**
  * Rename the Procedure at id to the given name.
  * Response: [Update].
@@ -10843,6 +11235,28 @@ export interface UpdateDeployment {
     config: _PartialDeploymentConfig;
 }
 /**
+ * Update the domain at the given id, and return the updated domain.
+ * Only fields set in the partial config are changed. Response: [Domain].
+ */
+export interface UpdateDomain {
+    /** The id of the domain to update. */
+    id: string;
+    /** The partial config update to apply. */
+    config: _PartialDomainConfig;
+}
+/**
+ * **Admin only.** Update a database domain account. Name and kind cannot
+ * change. Empty / missing `token` keeps the current token.
+ * Response: [DomainAccount].
+ */
+export interface UpdateDomainAccount {
+    /** Id or name */
+    id: string;
+    token?: string;
+    params?: JsonValue;
+    description?: string;
+}
+/**
  * **Admin only.** Update a git provider account.
  * Response: [GitProviderAccount].
  */
@@ -11329,6 +11743,9 @@ export type ExecuteRequest = {
 } | {
     type: "SendAlert";
     params: SendAlert;
+} | {
+    type: "ApplyDomain";
+    params: ApplyDomain;
 } | {
     type: "StartContainer";
     params: StartContainer;
@@ -11869,6 +12286,27 @@ export type ReadRequest = {
     type: "ListFullAlerters";
     params: ListFullAlerters;
 } | {
+    type: "GetDomain";
+    params: GetDomain;
+} | {
+    type: "ListDomains";
+    params: ListDomains;
+} | {
+    type: "ListFullDomains";
+    params: ListFullDomains;
+} | {
+    type: "GetDomainPlan";
+    params: GetDomainPlan;
+} | {
+    type: "ListDomainProviderKinds";
+    params: ListDomainProviderKinds;
+} | {
+    type: "ListDomainAccounts";
+    params: ListDomainAccounts;
+} | {
+    type: "GetDomainAccount";
+    params: GetDomainAccount;
+} | {
     type: "ExportAllResourcesToToml";
     params: ExportAllResourcesToToml;
 } | {
@@ -12223,6 +12661,30 @@ export type WriteRequest = {
 } | {
     type: "RenameAlerter";
     params: RenameAlerter;
+} | {
+    type: "CreateDomain";
+    params: CreateDomain;
+} | {
+    type: "CopyDomain";
+    params: CopyDomain;
+} | {
+    type: "DeleteDomain";
+    params: DeleteDomain;
+} | {
+    type: "UpdateDomain";
+    params: UpdateDomain;
+} | {
+    type: "RenameDomain";
+    params: RenameDomain;
+} | {
+    type: "CreateDomainAccount";
+    params: CreateDomainAccount;
+} | {
+    type: "UpdateDomainAccount";
+    params: UpdateDomainAccount;
+} | {
+    type: "DeleteDomainAccount";
+    params: DeleteDomainAccount;
 } | {
     type: "CreateOnboardingKey";
     params: CreateOnboardingKey;

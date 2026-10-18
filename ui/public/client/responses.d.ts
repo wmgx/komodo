@@ -115,6 +115,13 @@ export type ReadResponses = {
     GetAlerter: Types.GetAlerterResponse;
     ListAlerters: Types.ListAlertersResponse;
     ListFullAlerters: Types.ListFullAlertersResponse;
+    GetDomain: Types.GetDomainResponse;
+    ListDomains: Types.ListDomainsResponse;
+    ListFullDomains: Types.ListFullDomainsResponse;
+    GetDomainPlan: Types.GetDomainPlanResponse;
+    ListDomainProviderKinds: Types.ListDomainProviderKindsResponse;
+    ListDomainAccounts: Types.ListDomainAccountsResponse;
+    GetDomainAccount: Types.GetDomainAccountResponse;
     ExportAllResourcesToToml: Types.ExportAllResourcesToTomlResponse;
     ExportResourcesToToml: Types.ExportResourcesToTomlResponse;
     GetTag: Types.GetTagResponse;
@@ -218,6 +225,14 @@ export type WriteResponses = {
     DeleteAlerter: Types.Alerter;
     UpdateAlerter: Types.Alerter;
     RenameAlerter: Types.Update;
+    CreateDomain: Types.Domain;
+    CopyDomain: Types.Domain;
+    DeleteDomain: Types.Domain;
+    UpdateDomain: Types.Domain;
+    RenameDomain: Types.Update;
+    CreateDomainAccount: Types.CreateDomainAccountResponse;
+    UpdateDomainAccount: Types.UpdateDomainAccountResponse;
+    DeleteDomainAccount: Types.DeleteDomainAccountResponse;
     CreateOnboardingKey: Types.CreateOnboardingKeyResponse;
     UpdateOnboardingKey: Types.UpdateOnboardingKeyResponse;
     DeleteOnboardingKey: Types.DeleteOnboardingKeyResponse;
@@ -301,6 +316,7 @@ export type ExecuteResponses = {
     RunSync: Types.Update;
     TestAlerter: Types.Update;
     SendAlert: Types.Update;
+    ApplyDomain: Types.Update;
     StartContainer: Types.Update;
     RestartContainer: Types.Update;
     PauseContainer: Types.Update;

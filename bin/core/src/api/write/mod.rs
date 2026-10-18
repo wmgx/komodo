@@ -24,6 +24,7 @@ mod alerter;
 mod build;
 mod builder;
 mod deployment;
+mod domain;
 mod onboarding;
 mod permissions;
 mod procedure;
@@ -161,6 +162,16 @@ pub enum WriteRequest {
   DeleteAlerter(DeleteAlerter),
   UpdateAlerter(UpdateAlerter),
   RenameAlerter(RenameAlerter),
+
+  // ==== DOMAIN ====
+  CreateDomain(CreateDomain),
+  CopyDomain(CopyDomain),
+  DeleteDomain(DeleteDomain),
+  UpdateDomain(UpdateDomain),
+  RenameDomain(RenameDomain),
+  CreateDomainAccount(CreateDomainAccount),
+  UpdateDomainAccount(UpdateDomainAccount),
+  DeleteDomainAccount(DeleteDomainAccount),
 
   // ==== ONBOARDING KEY ====
   CreateOnboardingKey(CreateOnboardingKey),

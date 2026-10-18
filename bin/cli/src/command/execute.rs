@@ -131,6 +131,7 @@ pub async fn handle(
       DestroyStack,
       RunStackService,
       TestAlerter,
+      ApplyDomain,
       SendAlert,
       RemoveSwarmNodes,
       UpdateSwarmNode,

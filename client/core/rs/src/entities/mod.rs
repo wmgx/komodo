@@ -39,6 +39,10 @@ pub mod config;
 pub mod deployment;
 /// Networks, Images, Containers.
 pub mod docker;
+/// Subtypes of [Domain][domain::Domain].
+pub mod domain;
+/// Provider accounts used by [Domain][domain::Domain].
+pub mod domain_account;
 /// Subtypes of [LogConfig][logger::LogConfig].
 pub mod logger;
 /// Subtypes of [CreationKey][creation_key::CreationKey]
@@ -1349,6 +1353,16 @@ pub enum Operation {
   TestAlerter,
   SendAlert,
 
+  // Domain
+  CreateDomain,
+  UpdateDomain,
+  RenameDomain,
+  DeleteDomain,
+  ApplyDomain,
+  CreateDomainAccount,
+  UpdateDomainAccount,
+  DeleteDomainAccount,
+
   // Maintenance
   ClearRepoCache,
   BackupCoreDatabase,
@@ -1484,6 +1498,7 @@ pub enum ResourceTarget {
   Action(String),
   Builder(String),
   Alerter(String),
+  Domain(String),
   ResourceSync(String),
 }
 
@@ -1513,6 +1528,7 @@ impl ResourceTarget {
       ResourceTarget::Action(id) => id.is_empty(),
       ResourceTarget::Builder(id) => id.is_empty(),
       ResourceTarget::Alerter(id) => id.is_empty(),
+      ResourceTarget::Domain(id) => id.is_empty(),
       ResourceTarget::ResourceSync(id) => id.is_empty(),
     }
   }
@@ -1534,6 +1550,7 @@ impl ResourceTarget {
       ResourceTarget::Deployment(id) => id,
       ResourceTarget::Repo(id) => id,
       ResourceTarget::Alerter(id) => id,
+      ResourceTarget::Domain(id) => id,
       ResourceTarget::Procedure(id) => id,
       ResourceTarget::Action(id) => id,
       ResourceTarget::ResourceSync(id) => id,
@@ -1602,6 +1619,12 @@ impl From<&alerter::Alerter> for ResourceTarget {
   }
 }
 
+impl From<&domain::Domain> for ResourceTarget {
+  fn from(domain: &domain::Domain) -> Self {
+    Self::Domain(domain.id.clone())
+  }
+}
+
 impl ResourceTargetVariant {
   /// These need to use snake case
   pub fn toml_header(&self) -> &'static str {
@@ -1618,6 +1641,7 @@ impl ResourceTargetVariant {
       ResourceTargetVariant::ResourceSync => "resource_sync",
       ResourceTargetVariant::Builder => "builder",
       ResourceTargetVariant::Alerter => "alerter",
+      ResourceTargetVariant::Domain => "domain",
     }
   }
 }
@@ -1685,6 +1709,9 @@ pub fn resource_link(
     }
     ResourceTargetVariant::Alerter => {
       format!("/alerters/{id}")
+    }
+    ResourceTargetVariant::Domain => {
+      format!("/domains/{id}")
     }
   };
   format!("{host}{path}")
