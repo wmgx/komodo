@@ -1,5 +1,5 @@
 import { stackStateIntention } from "@/lib/color";
-import { StackDomains } from "@/resources/domain/service-domains";
+import { StackAccess } from "@/resources/domain/service-access";
 import {
   useInvalidate,
   useListItem,
@@ -384,7 +384,7 @@ export const StackComponents: RequiredResourceComponents<
 
   Config: StackTabs,
 
-  Page: { Domains: StackDomains },
+  Page: { Access: StackAccess },
 };
 
 export const DEFAULT_STACK_FILE_CONTENTS = `## Add your compose file here

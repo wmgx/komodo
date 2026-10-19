@@ -31,17 +31,17 @@ export function BoundDomainsNotice({
 }) {
   if (!domains.length) return null;
   return (
-    <Alert color="yellow" title="该服务绑定了域名">
+    <Alert color="yellow" title="This service is public">
       <Stack gap="xs">
         <Text fz="sm">{domains.map((d) => d.info.hostname).join(", ")}</Text>
         <Checkbox
           checked={checked}
           onChange={(e) => onChange(e.currentTarget.checked)}
-          label="同时删除这些域名（清理 Cloudflare 上的记录）"
+          label="Also stop public access"
         />
         {!checked && (
           <Text fz="xs" c="dimmed">
-            不勾选则保留域名，其状态会显示为「目标服务已不存在」。
+            Otherwise the address stays and shows an error.
           </Text>
         )}
       </Stack>

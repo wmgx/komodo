@@ -57,7 +57,7 @@ pub struct Derived {
   pub warnings: Vec<String>,
 }
 
-const NO_TUNNEL_HINT: &str = "该服务器还没有可用的隧道。想从外网访问，请先给这台服务器开通隧道（后续版本将支持一键开通），或在 Settings -> Domains 的账号里把已有隧道绑定到该服务器。";
+const NO_TUNNEL_HINT: &str = "This server has no public connection yet. Make a service public from the Services page to set one up.";
 
 fn zone_matches(hostname: &str, zone: &str) -> bool {
   hostname == zone || hostname.ends_with(&format!(".{zone}"))
@@ -113,7 +113,7 @@ fn invalid(msg: impl Into<String>) -> DomainError {
 pub fn derive(input: &DeriveInput) -> Result<Derived, DomainError> {
   if input.port == 0 {
     return Err(invalid(
-      "无法确定服务端口，请手动填写要暴露的端口。",
+      "Could not detect which port to use. Pick the port to publish.",
     ));
   }
   let server = input.server.as_ref();
@@ -131,7 +131,7 @@ pub fn derive(input: &DeriveInput) -> Result<Derived, DomainError> {
         Ok(_) => tunnel_accounts.push(i),
         Err(e) if e.code == code::TUNNEL_AMBIGUOUS => {
           return Err(invalid(format!(
-            "服务器 '{}' 在账号 '{}' 上绑定了多条隧道，无法自动选择。请在账号设置里只保留一条。",
+            "Server '{}' is linked to several tunnels of account '{}'. Keep only one in the account settings.",
             server.server.name, account.name
           )));
         }
@@ -141,7 +141,7 @@ pub fn derive(input: &DeriveInput) -> Result<Derived, DomainError> {
   }
   if tunnel_accounts.len() > 1 {
     return Err(invalid(
-      "服务器同时绑定了多个账号的隧道，无法自动选择。请在账号设置里只保留一个。",
+      "Server is linked to tunnels of several accounts. Keep only one in the account settings.",
     ));
   }
   let tunnel = tunnel_accounts.first().copied();
@@ -171,13 +171,13 @@ pub fn derive(input: &DeriveInput) -> Result<Derived, DomainError> {
   let dns_idx = match (matched.as_slice(), dns_accounts.as_slice()) {
     ([], []) => {
       return Err(invalid(
-        "还没有可管理 DNS 的域名账号。请先到 Settings -> Domains 添加账号。",
+        "No account can manage DNS yet. Add a Cloudflare account in Settings -> Domains first.",
       ));
     }
     ([], [only]) if input.accounts[*only].zones.is_empty() => *only,
     ([], _) => {
       return Err(invalid(format!(
-        "没有账号管理 '{}' 所在的域名区域（zone）。请检查主机名后缀，或在账号设置里勾选该 zone。",
+        "No account manages the domain of '{}'. Check the name, or allow that domain in the account settings.",
         input.hostname
       )));
     }
@@ -221,10 +221,10 @@ pub fn derive(input: &DeriveInput) -> Result<Derived, DomainError> {
   let Some(host) = server.and_then(|s| s.host.clone()) else {
     return Err(invalid(match server {
       Some(s) => format!(
-        "服务器 '{}' 没有对外地址，也没有隧道。请在服务器设置里填写 External Address，或先给它开通隧道。",
+        "Server '{}' has no public address and no public connection. Set its External Address in the server settings, or make a service public from the Services page.",
         s.server.name
       ),
-      None => "该服务没有关联到具体服务器（Swarm 模式暂不支持）。"
+      None => "This service is not tied to a single server (Swarm is not supported yet)."
         .to_string(),
     }));
   };
@@ -233,12 +233,12 @@ pub fn derive(input: &DeriveInput) -> Result<Derived, DomainError> {
     Ok(ip) => {
       if ip.is_loopback() || ip.is_unspecified() {
         return Err(invalid(format!(
-          "服务器地址 '{host}' 是本机回环地址，无法作为 DNS 目标。请在服务器设置里填写 External Address。"
+          "Server address '{host}' is a loopback address and cannot be a DNS target. Set the server's External Address in its settings."
         )));
       }
       if is_private(ip) {
         warnings.push(format!(
-          "目标是内网地址 {ip}，该域名只能在局域网内访问。想从外网访问，需要先给这台服务器开通隧道。"
+          "The target {ip} is a private address, so this name only works on your local network. Make the service public from the Services page to reach it from the internet."
         ));
       }
       (
@@ -345,7 +345,7 @@ mod tests {
     assert_eq!(d.mode, DomainMode::Dns);
     assert_eq!(d.config.dns.record_type, DnsRecordType::A);
     assert_eq!(d.config.dns.content, "192.168.31.251");
-    assert!(d.warnings[0].contains("局域网"));
+    assert!(d.warnings[0].contains("local network"));
     assert!(d.config.ingress.account.is_empty());
   }
 

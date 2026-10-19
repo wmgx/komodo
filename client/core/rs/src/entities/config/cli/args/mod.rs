@@ -93,6 +93,13 @@ pub enum Command {
     command: domain::DomainCommand,
   },
 
+  /// List services, make them public or private. (alias: `svc`)
+  #[clap(alias = "svc")]
+  Service {
+    #[command(subcommand)]
+    command: domain::ServiceCommand,
+  },
+
   /// Container info (aliases: `ps`, `cn`, `containers`)
   #[clap(alias = "ps", alias = "cn", alias = "containers")]
   Container(container::Container),

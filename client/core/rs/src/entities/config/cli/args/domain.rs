@@ -16,6 +16,52 @@ pub enum DomainCommand {
 }
 
 #[derive(Debug, Clone, clap::Subcommand)]
+pub enum ServiceCommand {
+  /// List Deployments and Stack services with ports and addresses.
+  List(ServiceListArgs),
+  /// Make a service reachable from the internet.
+  Expose(ServiceExposeArgs),
+  /// Stop public access to a service.
+  Unexpose(ServiceUnexposeArgs),
+}
+
+#[derive(Debug, Clone, clap::Parser)]
+pub struct ServiceListArgs {
+  /// Only services on this Server (name or id).
+  #[arg(long)]
+  pub server: Option<String>,
+  /// Print as JSON.
+  #[arg(long, default_value_t = false)]
+  pub json: bool,
+}
+
+#[derive(Debug, Clone, clap::Parser)]
+pub struct ServiceExposeArgs {
+  /// A Deployment name, or `stack/service`.
+  pub service: String,
+  /// Subdomain, eg. `grafana`. Defaults to the service name.
+  pub prefix: Option<String>,
+  /// Domain to put it under. Optional when there is only one.
+  #[arg(long)]
+  pub zone: Option<String>,
+  /// Published port. Chosen automatically when omitted.
+  #[arg(long, default_value_t = 0)]
+  pub port: u16,
+  /// Don't ask before overwriting existing records Komodo does not own.
+  #[arg(long, short = 'y', default_value_t = false)]
+  pub yes: bool,
+}
+
+#[derive(Debug, Clone, clap::Parser)]
+pub struct ServiceUnexposeArgs {
+  /// A Deployment name, or `stack/service`.
+  pub service: String,
+  /// Don't ask for confirmation.
+  #[arg(long, short = 'y', default_value_t = false)]
+  pub yes: bool,
+}
+
+#[derive(Debug, Clone, clap::Subcommand)]
 pub enum TunnelCommand {
   /// Create a tunnel and run its connector (cloudflared) on the Server.
   Enable(TunnelEnableArgs),

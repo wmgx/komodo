@@ -375,6 +375,80 @@ pub struct ServiceDomainResult {
   pub reason: Option<DomainReason>,
 }
 
+/// Where `ExposeService` currently is. Only set while it runs.
+#[typeshare]
+#[derive(
+  Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq,
+)]
+pub enum ExposeStage {
+  /// Opening the connection of the Server.
+  Connecting,
+  /// Setting up the public address.
+  Configuring,
+}
+
+/// A published port of a service.
+#[typeshare]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+pub struct ServicePort {
+  /// Port on the Server.
+  pub host: u16,
+  /// Port inside the container.
+  pub container: u16,
+  /// `http://<server host>:<host port>`. Unset when the Server has no
+  /// usable address.
+  pub lan_url: Option<String>,
+}
+
+/// A public address of a service.
+#[typeshare]
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ServicePublicUrl {
+  /// `https://<hostname>`
+  pub url: String,
+  /// Name of the backing Domain resource.
+  pub domain: String,
+  pub domain_id: String,
+  pub port: u16,
+  /// `ready` | `drifted` | `error` | `unchecked`
+  pub status: String,
+}
+
+/// One Deployment, or one service of a Stack.
+#[typeshare]
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ServiceItem {
+  /// The Deployment, or the Stack of the service.
+  pub target: ResourceTarget,
+  /// Stack service name. Empty for a Deployment.
+  pub service: String,
+  /// Deployment name, or Stack service name.
+  pub name: String,
+  /// Stack name. Empty for a Deployment.
+  pub stack: String,
+  pub server_id: String,
+  pub server_name: String,
+  /// Container state, eg. `Running`, `Exited`.
+  pub state: String,
+  pub ports: Vec<ServicePort>,
+  pub public: Vec<ServicePublicUrl>,
+  /// Set while `ExposeService` runs for this service.
+  pub expose: Option<ExposeStage>,
+}
+
+/// Result of ExposeService.
+#[typeshare]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct ExposeServiceResult {
+  /// `https://...` once the service is public.
+  pub url: Option<String>,
+  /// Remote objects which exist but are not managed by Komodo.
+  /// Non empty + `url` unset = confirm, then retry with `adopt_conflicts`.
+  pub conflicts: Vec<Change>,
+  /// Why nothing was done / what failed, with the next step.
+  pub error: Option<String>,
+}
+
 // QUERY
 
 #[typeshare]

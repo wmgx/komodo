@@ -9,8 +9,10 @@
 //! only references it (`TUNNEL_TOKEN=[[VAR]]`). See doc/domains-v2-design.md
 //! for the trade-offs.
 
+use std::time::Duration;
+
 use database::mungos::{
-  find::find_collect, mongodb::bson::doc,
+  by_id::find_one_by_id, find::find_collect, mongodb::bson::doc,
   mongodb::bson::oid::ObjectId,
 };
 use komodo_client::{
@@ -23,6 +25,7 @@ use komodo_client::{
     domain::Domain,
     domain_account::{ServerTunnel, ServerTunnelState},
     server::ServerState,
+    update::UpdateStatus,
     user::User,
     variable::Variable,
   },
@@ -30,7 +33,7 @@ use komodo_client::{
 use serde_json::Value;
 
 use crate::{
-  api::execute::{ExecuteRequest, inner_handler},
+  api::execute::{ExecuteRequest, ExecutionResult, inner_handler},
   helpers::query::{get_cached_server_state, get_deployment_state},
   resource,
   state::{all_resources_cache, db_client},
@@ -63,7 +66,7 @@ impl Candidate {
   fn provision(&self) -> Result<&dyn ProvisionProvider, DomainError> {
     self.set.provision.as_deref().ok_or_else(|| {
       DomainError::invalid(format!(
-        "账号 '{}' 不支持一键开通隧道",
+        "Account '{}' cannot open connections by itself",
         self.account.name
       ))
     })
@@ -80,7 +83,9 @@ fn resolve_server(
       name: s.name.clone(),
     })
     .ok_or_else(|| {
-      DomainError::invalid(format!("服务器 '{id_or_name}' 不存在"))
+      DomainError::invalid(format!(
+        "Server '{id_or_name}' does not exist"
+      ))
     })
 }
 
@@ -149,7 +154,7 @@ async fn find_deployment(
   match found {
     Some(d) if d.config.server_id == server.id => Ok(Some(d)),
     Some(d) => Err(DomainError::invalid(format!(
-      "已有一个名为 '{}' 的 Deployment 不在这台服务器上，请先改名或删除它。",
+      "A Deployment named '{}' already exists on another server. Rename or delete it, then try again.",
       d.name
     ))),
     None => Ok(None),
@@ -253,8 +258,10 @@ async fn status_of(
     Ok(status) => out.remote_status = Some(status),
     Err(e) => {
       e.log("GetServerTunnel status");
-      out.warning =
-        Some(format!("读取隧道连接状态失败：{}", e.message));
+      out.warning = Some(format!(
+        "Could not read the connection status: {}",
+        e.message
+      ));
     }
   }
   let connector_up = matches!(
@@ -273,7 +280,7 @@ async fn status_of(
   };
   if deployment.is_none() && out.warning.is_none() {
     out.warning = Some(
-      "隧道已登记，但这台服务器上还没有 cloudflared。再点一次「开通」即可继续。"
+      "The connection is registered but nothing runs on this server yet. Make a service public again to finish setting it up."
         .into(),
     );
   }
@@ -305,7 +312,7 @@ fn require_db_account(
 ) -> Result<(), DomainError> {
   if account.id.is_empty() {
     return Err(DomainError::invalid(format!(
-      "账号 '{}' 声明在 Core 配置文件里，是只读的，无法登记隧道。请在 Settings -> Domains 里新建一个账号。",
+      "Account '{}' is declared in the Core config file and is read only. Create an account in Settings -> Domains instead.",
       account.name
     )));
   }
@@ -363,13 +370,37 @@ fn api_error(e: impl std::fmt::Debug) -> DomainError {
   DomainError::invalid(format!("{e:?}"))
 }
 
-/// Create the connector Deployment (or fix its image) and deploy it.
+/// How long one connector Deploy may take (image pull included).
+const DEPLOY_TIMEOUT: Duration = Duration::from_secs(300);
+
+/// Wait for an Update to finish, then say whether it succeeded.
+async fn update_succeeded(id: &str) -> Result<bool, DomainError> {
+  let deadline = tokio::time::Instant::now() + DEPLOY_TIMEOUT;
+  loop {
+    let update = find_one_by_id(&db_client().updates, id)
+      .await
+      .map_err(|e| DomainError::internal(format!("{e:#}")))?;
+    if let Some(update) = update
+      && update.status == UpdateStatus::Complete
+    {
+      return Ok(update.success);
+    }
+    if tokio::time::Instant::now() >= deadline {
+      return Ok(false);
+    }
+    tokio::time::sleep(Duration::from_secs(2)).await;
+  }
+}
+
+/// Create the connector Deployment (or fix its image), deploy it and wait
+/// for the Deploy to finish. `false` = the container did not start, which
+/// is what a blocked registry looks like (the pull fails).
 async fn deploy_connector(
   server: &ServerRef,
   spec: &ConnectorSpec,
   existing: Option<Deployment>,
   user: &User,
-) -> Result<(), DomainError> {
+) -> Result<bool, DomainError> {
   let var = variable_name(server);
   let [(env_key, token)] = spec.env.as_slice() else {
     return Err(DomainError::internal("unexpected connector env"));
@@ -415,7 +446,7 @@ async fn deploy_connector(
       name
     }
   };
-  inner_handler(
+  let ExecutionResult::Single(update) = inner_handler(
     ExecuteRequest::Deploy(Deploy {
       deployment: name,
       stop_signal: None,
@@ -424,8 +455,25 @@ async fn deploy_connector(
     user.clone(),
   )
   .await
-  .map_err(api_error)?;
-  Ok(())
+  .map_err(api_error)?
+  else {
+    return Err(DomainError::internal("unexpected Deploy result"));
+  };
+  update_succeeded(&update.id).await
+}
+
+/// Preferred image first, then the fallbacks, without repeats.
+fn image_candidates(
+  preferred: &str,
+  fallbacks: &[String],
+) -> Vec<String> {
+  let mut out = vec![preferred.to_string()];
+  for image in fallbacks {
+    if !out.contains(image) {
+      out.push(image.clone());
+    }
+  }
+  out
 }
 
 pub async fn enable(
@@ -439,7 +487,7 @@ pub async fn enable(
     Some((c, _)) => {
       if req.account.as_deref().is_some_and(|a| a != c.account.name) {
         return Err(DomainError::invalid(format!(
-          "这台服务器的隧道属于账号 '{}'，不能改用其他账号。",
+          "This server's connection belongs to account '{}', another account cannot be used.",
           c.account.name
         )));
       }
@@ -456,12 +504,12 @@ pub async fn enable(
         [one] => *one,
         [] => {
           return Err(DomainError::invalid(
-            "没有可以一键开通隧道的账号。请先到 Settings -> Domains 添加 Cloudflare 账号。",
+            "No account can open a public connection yet. Add a Cloudflare account in Settings -> Domains first.",
           ));
         }
         many => {
           return Err(DomainError::invalid(format!(
-            "有多个账号可以开通隧道（{}），请指定其中一个。",
+            "Several accounts can open a public connection ({}). Pass the one to use.",
             many
               .iter()
               .map(|c| c.account.name.as_str())
@@ -491,36 +539,38 @@ pub async fn enable(
   let state = get_cached_server_state(&server.id).await;
   if state != ServerState::Ok {
     return Err(DomainError::invalid(format!(
-      "服务器 '{}' 当前不可用（{state:?}），无法在上面部署 cloudflared。",
+      "Server '{}' is not reachable (state: {state:?}), so the connection cannot be set up on it. Bring the server back online and try again.",
       server.name
     )));
   }
 
-  let image = req
+  let preferred = req
     .image
     .as_deref()
     .map(str::trim)
     .filter(|i| !i.is_empty())
     .map(str::to_string)
     .unwrap_or_else(|| provision.default_image());
+  let candidates =
+    image_candidates(&preferred, &provision.fallback_images());
 
-  let spec = match found {
-    Some((_, handle)) => {
-      if image != provision.default_image() {
-        let params =
-          provision.remember_image(&candidate.account.params, &image);
-        save_params(&candidate.account, &params).await?;
-      }
-      provision.connector(&handle, &image).await?
-    }
+  // `stored`: the image the account remembers right now.
+  let (handle, mut params, stored, mut first_spec) = match found {
+    Some((_, handle)) => (
+      handle,
+      candidate.account.params.clone(),
+      provision.default_image(),
+      None,
+    ),
     None => {
-      let created =
-        provision.provision(&tunnel_name(&server), &image).await?;
+      let created = provision
+        .provision(&tunnel_name(&server), &candidates[0])
+        .await?;
       let params = provision.register(
         &candidate.account.params,
         &created.handle,
         &server,
-        &image,
+        &candidates[0],
       );
       if let Err(e) = save_params(&candidate.account, &params).await {
         // Registration failed: don't leave an unknown tunnel behind.
@@ -530,11 +580,40 @@ pub async fn enable(
         }
         return Err(e);
       }
-      created.connector
+      (
+        created.handle,
+        params,
+        candidates[0].clone(),
+        Some(created.connector),
+      )
     }
   };
-  deploy_connector(&server, &spec, deployment, user).await?;
-  status_of(&server).await
+
+  // A failed Deploy usually means the image could not be pulled (the
+  // registry is blocked from this host): move on to the next source.
+  for image in &candidates {
+    let spec = match first_spec.take() {
+      Some(spec) => spec,
+      None => provision.connector(&handle, image).await?,
+    };
+    let existing = find_deployment(&server).await?;
+    if deploy_connector(&server, &spec, existing, user).await? {
+      if *image != stored {
+        params = provision.remember_image(&params, image);
+        save_params(&candidate.account, &params).await?;
+      }
+      return status_of(&server).await;
+    }
+    warn!(
+      "cloudflared did not start on '{}' with image '{image}', trying the next source",
+      server.name
+    );
+  }
+  Err(DomainError::invalid(format!(
+    "The connection could not be started on server '{0}': cloudflared failed to start from every image source. Check that '{0}' has internet access and see the Update log of Deployment '{1}', then try again.",
+    server.name,
+    deployment_name(&server)
+  )))
 }
 
 pub async fn disable(
@@ -549,7 +628,7 @@ pub async fn disable(
   };
   if !handle.managed {
     return Err(DomainError::invalid(
-      "这条隧道不是 Komodo 创建的，请在 Settings -> Domains 的账号参数里手动解绑。",
+      "This connection was not created by Komodo. Remove it by hand in the account params in Settings -> Domains.",
     ));
   }
   require_db_account(&candidate.account)?;
@@ -566,7 +645,7 @@ pub async fn disable(
   .await?;
   if !used.is_empty() {
     return Err(DomainError::invalid(format!(
-      "还有域名在使用这条隧道：{}。请先删除这些域名。",
+      "Still in use by public addresses: {}. Stop public access of those services first.",
       used.join(", ")
     )));
   }
@@ -584,4 +663,22 @@ pub async fn disable(
     provision.unregister(&candidate.account.params, &handle);
   save_params(&candidate.account, &params).await?;
   status_of(&server).await
+}
+
+#[cfg(test)]
+mod tests {
+  use super::image_candidates;
+
+  #[test]
+  fn candidates_start_with_preferred_and_skip_repeats() {
+    let fallbacks =
+      ["official:1", "mirror-a:1", "mirror-b:1"].map(String::from);
+    // A remembered mirror is tried first, the official image is still
+    // tried before the other mirror.
+    assert_eq!(
+      image_candidates("mirror-a:1", &fallbacks),
+      ["mirror-a:1", "official:1", "mirror-b:1"]
+    );
+    assert_eq!(image_candidates("custom:1", &fallbacks).len(), 4);
+  }
 }

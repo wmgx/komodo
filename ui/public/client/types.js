@@ -849,6 +849,14 @@ export var ServerState;
     /** Server is disabled. */
     ServerState["Disabled"] = "Disabled";
 })(ServerState || (ServerState = {}));
+/** Where `ExposeService` currently is. Only set while it runs. */
+export var ExposeStage;
+(function (ExposeStage) {
+    /** Opening the connection of the Server. */
+    ExposeStage["Connecting"] = "Connecting";
+    /** Setting up the public address. */
+    ExposeStage["Configuring"] = "Configuring";
+})(ExposeStage || (ExposeStage = {}));
 export var StackState;
 (function (StackState) {
     /** The stack is currently re/deploying */

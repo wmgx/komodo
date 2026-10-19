@@ -1,7 +1,7 @@
 use komodo_client::{
   api::read::*,
   entities::{
-    domain::{Domain, DomainListItem, DomainPlan},
+    domain::{Domain, DomainListItem, DomainPlan, ServiceItem},
     domain_account::{
       DomainAccount, DomainDiscovery, DomainProviderKind,
       ServerTunnel,
@@ -16,6 +16,7 @@ use reqwest::StatusCode;
 use crate::{
   domain::{
     accounts,
+    listing::list_services,
     prepare::plan_domain,
     provider::{REGISTRY, factory},
     tunnel,
@@ -94,6 +95,17 @@ impl Resolve<ReadArgs> for ListServiceDomains {
       )
       .await?,
     )
+  }
+}
+
+impl Resolve<ReadArgs> for ListServices {
+  async fn resolve(
+    self,
+    ReadArgs { user }: &ReadArgs,
+  ) -> mogh_error::Result<Vec<ServiceItem>> {
+    list_services(user, self.server.as_deref())
+      .await
+      .map_err(|e| e.status_code(StatusCode::BAD_REQUEST))
   }
 }
 

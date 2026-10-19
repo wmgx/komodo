@@ -101,7 +101,7 @@ DomainConfig {
 
 1. `mode=Auto|Tunnel` 且目标 Server 在某账号里绑定了隧道（`select(None, server)` 成功）：**Tunnel**。隧道规则 `hostname -> http://localhost:<port>`，**默认假定隧道 agent（cloudflared）以 host 网络运行在该 Server 上**；DNS 为 CNAME 到 `<tunnel_id>.cfargotunnel.com` 且 proxied。多条/多账号匹配报错，不猜。
 2. 否则（`Auto|Dns`）：**DNS**，目标取 Server 的 `external_address`，为空则取 `address` 的 host。IP 用 A / AAAA，域名用 CNAME，不 proxied。私网（10/8、172.16/12、192.168/16、100.64/10、链路本地、IPv6 ULA）返回警告「只能在局域网访问」；回环地址报错。DNS 模式没有端口转发，访问地址是 `http://hostname:port`。
-3. 都无法确定（没有隧道也没有地址、Swarm 目标、没有账号覆盖该 zone）：返回可操作提示。提示里引导「先给服务器开通隧道」（见 6.2），Add domain 弹窗里有一键开通按钮。
+3. 都无法确定（没有隧道也没有地址、Swarm 目标、没有账号覆盖该 zone）：返回可操作提示。提示里引导从 Services 页面 Make public（会自动开通，见 6.3）。
 4. DNS 账号 = 其 zone（`params.zones` 白名单，否则发现结果）覆盖主机名的账号，优先与隧道同账号；只有一个 DNS 账号且 zone 未知时直接用它。多个 DNS 账号时才会联网发现 zone。
 5. 端口：请求未带 `port` 时，Deployment 取 `config.ports` 唯一的宿主端口；Stack 必须由调用方给出（UI 从 `ListStackServices` 的容器端口读取）。
 
@@ -135,12 +135,31 @@ UI 的 Add domain 弹窗会在本地复刻「有无隧道 / 是否内网」做�
 
 **不做**：多隧道负载均衡、Access 策略、本地配置文件模式。connector 假定以 host 网络和 `localhost:<端口>` 回源（与自动推导一致）。
 
+### 6.3 以服务为中心：ListServices / ExposeService / UnexposeService（第 3 版）
+
+用户只关心服务，不关心 Domain / DNS / Tunnel。上面的能力保留，在其上加一层：
+
+- `ListServices { server? }`（读）：聚合所有 Stack service 与 Deployment（按用户 Read 权限过滤），每项含 `target`、`service`、`stack`、`server`、`state`、`ports`（宿主机端口 -> 容器端口，附 `lan_url = http://<server 地址的 host>:<宿主机端口>`）、`public`（来自 Domain：`url`、`status`）、`expose`（进行中的阶段）。数据来自 stack / deployment 状态缓存与 Domain 列表，不调用 Periphery 与厂商 API；server 地址的取法与 `auto.rs` 一致（`external_address` 优先，取 host 部分），回环地址不生成 LAN URL。
+- `ExposeService { target, service?, prefix?, zone?, port?, adopt_conflicts? }`（写，管理员）：服务端一次完成：
+  1. 解析服务与所在 Server；`prefix` 缺省为服务名，合法化为小写字母 / 数字 / `-`（其他字符变 `-`）；`zone` 缺省时取账号 `params.zones`，为空则只读发现，只有一个才自动选，多个则报错并列出。
+  2. 端口缺省时：已发布端口里选最像 HTTP 的（80、8080、3000、9120、8000、8888、443、5000，否则第一个）；Deployment 回退到配置里的单个端口。
+  3. `EnableServerTunnel` 同一逻辑（`tunnel::enable`）：已连通则立即返回，否则创建隧道并部署 cloudflared，阶段 `Connecting`。
+  4. `AddServiceDomain` 同一逻辑（`add_service_domain`），强制 `Tunnel` 模式，阶段 `Configuring`。随后最多等 30 秒让连接变 healthy，不影响结果。
+  5. 返回 `{ url, conflicts, error }`。有远端同名且不归 Komodo 管的记录时返回 `conflicts`，确认后带 `adopt_conflicts` 重试。
+  请求是同步的（首次约 1 分钟）。进度记在 Core 内存里（按服务一份，同一服务同时只允许一次），`ListServices` 返回 `expose` 字段，UI 弹窗每 1.5 秒轮询它显示步骤；Core 重启则丢失进度，但已完成的步骤是幂等的，重试即可继续。
+- `UnexposeService { target, service? }`（写，管理员）：删除该服务绑定的全部 Domain（走 Domain 删除，`on_delete = Cleanup` 清理远端），返回被删除的主机名。隧道本身保留。
+
+**cloudflared 镜像自动兜底**（`tunnel::enable`）：候选镜像 = 首选（账号已记住的镜像，否则官方）+ 提供商的 `fallback_images()`（Cloudflare：官方 `cloudflare/cloudflared:latest`、`docker.1ms.run/cloudflare/cloudflared:latest`、`docker.m.daocloud.io/cloudflare/cloudflared:latest`，常量在 `cloudflare_provision.rs`），去重后按顺序尝试。每个候选：创建 / 更新 connector Deployment 的 image，执行 `Deploy`，轮询该 Update 直到 `Complete`（最长 5 分钟）。**判定失败**：Deploy 的 Update `success == false`（`docker run` 拉不到镜像时周边服务返回失败日志）或超时；这是最简单可靠的信号，其他原因导致的失败同样会换源重试，最终都失败时给出可操作的报错。成功后若镜像与账号记住的不同，写回账号 params 的 `cloudflared_image`，下次直接使用。
+
 ## 7. UI 与 CLI
 
 - UI：`ui/src/resources/domain/`（`index` 注册、`config` 配置表单、`plan` Plan 预览与 Apply、`table`）；设置页「Domains」标签管理账号（`ui/src/pages/settings/domain-accounts/`，仅管理员可见）。Plan 需手动点击才会联网；有 Conflict 时必须勾选确认才会带 `adopt_conflicts=true`。
-- 服务页：Stack / Deployment 详情页的「Domains」区块（`ui/src/resources/domain/service-domains.tsx`，经资源的 `Page` 插槽挂载）；删除服务的确认框（`resources/delete.tsx`）会列出绑定域名并可勾选同时删除，不勾选则 Domain 状态显示「目标服务已不存在」（纯 UI 判断）。Domains 列表有 Service 列可跳转。
-- 开通隧道：Add domain 弹窗在「没有隧道」（含内网地址）的提示旁有「为这台服务器开通隧道」按钮，弹出确认框（镜像带默认值可改，列出会做什么），确认后执行 `EnableServerTunnel` 并显示连接进度，开通成功后弹窗自动切到 Tunnel 模式；Server 详情页的「Cloudflare Tunnel」区块（`server-tunnel.tsx`，经 Server 的 `Page` 插槽挂载，仅管理员）显示状态并提供开通/关闭。
-- CLI：`km domain tunnel enable|disable|status <server> [--account] [--image] [--keep-remote] [-y]`、`km domain add <stack|deployment> <name> <hostname> [--service] [--port] [--mode] [-y]`、`km list domains`、`km domain plan <d> [--json]`、`km domain apply <d> [--plan-id] [--adopt-conflicts] [-y]`、`km domain status <d> [--json]`、`km execute apply-domain`。不提供账号管理命令（token 不应出现在命令行参数）。
+- 服务总览：侧边栏 **Services**（`ui/src/pages/services/`，一张表：Service / Server / State / Ports / LAN URL / Public URL / 操作，按 Server 过滤、搜索）。「Make public」弹窗与「Stop public access」在 `ui/src/resources/domain/make-public.tsx`，总览页与详情页共用。
+- 详情页：Stack / Deployment 页的「Access」区块（`service-access.tsx`，经资源的 `Page` 插槽挂载）显示每个端口的 LAN 地址、公网地址和上述两个操作；Domain 资源链接、接入方式、状态原因收在「Details」折叠项里。删除服务的确认框（`resources/delete.tsx`）提示「This service is public」并可勾选「Also stop public access」，不勾选则 Domain 状态显示「Service no longer exists」（纯 UI 判断）。
+- Server 页：「Public access」一行（`server-tunnel.tsx`）只显示连接状态与 Disable；开通在第一次 Make public 时自动完成，没有单独的开通步骤和镜像输入。
+- 侧边栏不再有 Domains（`SIDEBAR_RESOURCES` 排除 `Domain`），入口在 Settings -> Domains 底部的「Advanced: Domains」链接；资源路由 `/domains` 保留给 AI、ResourceSync 与排查。界面文案统一为英文。
+- UI 其余部分：`ui/src/resources/domain/`（`index` 注册、`config` 配置表单、`plan` Plan 预览与 Apply、`table`）；设置页「Domains」标签管理账号（`ui/src/pages/settings/domain-accounts/`，仅管理员可见）。Plan 需手动点击才会联网；有 Conflict 时必须勾选确认才会带 `adopt_conflicts=true`。
+- CLI：`km service list [--server] [--json]`、`km service expose <deployment|stack/service> [prefix] [--zone] [--port] [-y]`、`km service unexpose <service> [-y]`；高级：`km domain tunnel enable|disable|status <server> [--account] [--image] [--keep-remote] [-y]`、`km domain add <stack|deployment> <name> <hostname> [--service] [--port] [--mode] [-y]`、`km list domains`、`km domain plan <d> [--json]`、`km domain apply <d> [--plan-id] [--adopt-conflicts] [-y]`、`km domain status <d> [--json]`、`km execute apply-domain`。不提供账号管理命令（token 不应出现在命令行参数）。
 
 ## 8. 已知限制
 

@@ -2014,6 +2014,19 @@ export interface TomlResponse {
 }
 export type ExportAllResourcesToTomlResponse = TomlResponse;
 export type ExportResourcesToTomlResponse = TomlResponse;
+/** Result of ExposeService. */
+export interface ExposeServiceResult {
+    /** `https://...` once the service is public. */
+    url?: string;
+    /**
+     * Remote objects which exist but are not managed by Komodo.
+     * Non empty + `url` unset = confirm, then retry with `adopt_conflicts`.
+     */
+    conflicts: Change[];
+    /** Why nothing was done / what failed, with the next step. */
+    error?: string;
+}
+export type ExposeServiceResponse = ExposeServiceResult;
 export type FindUserResponse = User;
 export interface GenericResourcesInnerNamedResourceSpec {
     Kind?: string;
@@ -5828,6 +5841,56 @@ export interface ServerListItemInfo {
 export type ServerListItem = ResourceListItem<ServerListItemInfo>;
 export type ListServersResponse = ServerListItem[];
 export type ListServiceDomainsResponse = DomainListItem[];
+/** A published port of a service. */
+export interface ServicePort {
+    /** Port on the Server. */
+    host: number;
+    /** Port inside the container. */
+    container: number;
+    /**
+     * `http://<server host>:<host port>`. Unset when the Server has no
+     * usable address.
+     */
+    lan_url?: string;
+}
+/** A public address of a service. */
+export interface ServicePublicUrl {
+    /** `https://<hostname>` */
+    url: string;
+    /** Name of the backing Domain resource. */
+    domain: string;
+    domain_id: string;
+    port: number;
+    /** `ready` | `drifted` | `error` | `unchecked` */
+    status: string;
+}
+/** Where `ExposeService` currently is. Only set while it runs. */
+export declare enum ExposeStage {
+    /** Opening the connection of the Server. */
+    Connecting = "Connecting",
+    /** Setting up the public address. */
+    Configuring = "Configuring"
+}
+/** One Deployment, or one service of a Stack. */
+export interface ServiceItem {
+    /** The Deployment, or the Stack of the service. */
+    target: ResourceTarget;
+    /** Stack service name. Empty for a Deployment. */
+    service: string;
+    /** Deployment name, or Stack service name. */
+    name: string;
+    /** Stack name. Empty for a Deployment. */
+    stack: string;
+    server_id: string;
+    server_name: string;
+    /** Container state, eg. `Running`, `Exited`. */
+    state: string;
+    ports: ServicePort[];
+    public: ServicePublicUrl[];
+    /** Set while `ExposeService` runs for this service. */
+    expose?: ExposeStage;
+}
+export type ListServicesResponse = ServiceItem[];
 export type ListStackServicesResponse = StackService[];
 export declare enum StackState {
     /** The stack is currently re/deploying */
@@ -6190,6 +6253,8 @@ export interface SwarmQuerySpecifics {
     servers: string[];
 }
 export type SwarmQuery = ResourceQuery<SwarmQuerySpecifics>;
+/** Hostnames which were removed. */
+export type UnexposeServiceResponse = string[];
 export type UpdateDomainAccountResponse = DomainAccount;
 export type UpdateGitProviderAccountResponse = GitProviderAccount;
 export type UpdateImageRegistryAccountResponse = ImageRegistryAccount;
@@ -8077,6 +8142,30 @@ export interface ExportResourcesToToml {
      * the meta configuration.
      */
     existing?: ResourcesToml;
+}
+/**
+ * **Admin only.** Make a Deployment / Stack service reachable from the
+ * internet in one call: opens the connection of its Server when needed,
+ * then adds `<prefix>.<zone>` pointing at the service.
+ * May take a minute the first time on a Server.
+ * Response: [ExposeServiceResult].
+ */
+export interface ExposeService {
+    /** Deployment or Stack (id or name). */
+    target: ResourceTarget;
+    /** Service name, required for Stacks. */
+    service?: string;
+    /** Subdomain, eg. `grafana`. Defaults to the service name. */
+    prefix?: string;
+    /**
+     * Domain to put it under, eg. `example.com`.
+     * Optional when there is only one.
+     */
+    zone?: string;
+    /** Published port. Chosen automatically when 0. */
+    port?: number;
+    /** Overwrite existing remote records which Komodo does not own. */
+    adopt_conflicts?: boolean;
 }
 /**
  * **Admin only.**
@@ -10037,6 +10126,15 @@ export interface ListServers {
 export interface ListServiceDomains {
     target: ResourceTarget;
 }
+/**
+ * All Deployments and Stack services the user can read, with state,
+ * published ports, LAN addresses and public addresses. Reads caches only.
+ * Response: [ListServicesResponse].
+ */
+export interface ListServices {
+    /** Only services on this Server (id or name). */
+    server?: string;
+}
 /** Lists a specific stacks services (the containers). Response: [ListStackServicesResponse]. */
 export interface ListStackServices {
     /** Id or name */
@@ -11288,6 +11386,16 @@ export interface TotalDiskUsage {
     /** Total size in GB */
     total_gb: number;
 }
+/**
+ * **Admin only.** Stop public access to a Deployment / Stack service:
+ * removes its public addresses. Response: [UnexposeServiceResponse].
+ */
+export interface UnexposeService {
+    /** Deployment or Stack (id or name). */
+    target: ResourceTarget;
+    /** Service name, required for Stacks. */
+    service?: string;
+}
 /** Unpauses all containers on the target server. Response: [Update] */
 export interface UnpauseAllContainers {
     /** Name or id */
@@ -12476,6 +12584,9 @@ export type ReadRequest = {
     type: "ListServiceDomains";
     params: ListServiceDomains;
 } | {
+    type: "ListServices";
+    params: ListServices;
+} | {
     type: "GetDomainPlan";
     params: GetDomainPlan;
 } | {
@@ -12857,6 +12968,12 @@ export type WriteRequest = {
 } | {
     type: "AddServiceDomain";
     params: AddServiceDomain;
+} | {
+    type: "ExposeService";
+    params: ExposeService;
+} | {
+    type: "UnexposeService";
+    params: UnexposeService;
 } | {
     type: "EnableServerTunnel";
     params: EnableServerTunnel;

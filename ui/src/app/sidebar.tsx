@@ -20,6 +20,12 @@ const Sidebar = ({ close }: { close: () => void }) => {
             {...linkProps}
           />
           <SidebarLink
+            label="Services"
+            icon={<ICONS.Deployment size="1rem" />}
+            to="/services"
+            {...linkProps}
+          />
+          <SidebarLink
             label="Containers"
             icon={<ICONS.Container size="1rem" />}
             to="/containers"

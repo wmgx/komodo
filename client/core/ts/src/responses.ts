@@ -152,6 +152,7 @@ export type ReadResponses = {
   ListDomains: Types.ListDomainsResponse;
   ListFullDomains: Types.ListFullDomainsResponse;
   ListServiceDomains: Types.ListServiceDomainsResponse;
+  ListServices: Types.ListServicesResponse;
   GetDomainPlan: Types.GetDomainPlanResponse;
   ListDomainProviderKinds: Types.ListDomainProviderKindsResponse;
   ListDomainAccounts: Types.ListDomainAccountsResponse;
@@ -310,6 +311,8 @@ export type WriteResponses = {
   CreateDomain: Types.Domain;
   CopyDomain: Types.Domain;
   AddServiceDomain: Types.AddServiceDomainResponse;
+  ExposeService: Types.ExposeServiceResponse;
+  UnexposeService: Types.UnexposeServiceResponse;
   EnableServerTunnel: Types.EnableServerTunnelResponse;
   DisableServerTunnel: Types.DisableServerTunnelResponse;
   DeleteDomain: Types.Domain;

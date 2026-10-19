@@ -4,7 +4,7 @@ use komodo_client::{
   api::write::*,
   entities::{
     Operation, ResourceTarget,
-    domain::{Domain, ServiceDomainResult},
+    domain::{Domain, ExposeServiceResult, ServiceDomainResult},
     domain_account::{DomainAccount, DomainAccountDoc, ServerTunnel},
     permission::PermissionLevel,
     update::Update,
@@ -18,6 +18,7 @@ use crate::{
   domain::{
     accounts::{self, ResolvedAccount},
     error::DomainError,
+    expose::{ExposeRequest, expose, unexpose},
     provider::factory,
     service::{AddRequest, add_service_domain},
     tunnel::{self, EnableRequest},
@@ -55,7 +56,7 @@ impl Resolve<WriteArgs> for AddServiceDomain {
     self,
     WriteArgs { user }: &WriteArgs,
   ) -> mogh_error::Result<ServiceDomainResult> {
-    require_admin(user, "add service domains with")?;
+    require_admin(user, "add service domains")?;
     add_service_domain(
       AddRequest {
         target: self.target,
@@ -72,6 +73,56 @@ impl Resolve<WriteArgs> for AddServiceDomain {
   }
 }
 
+impl Resolve<WriteArgs> for ExposeService {
+  #[instrument(
+    "ExposeService",
+    skip_all,
+    fields(operator = user.id, service = self.service)
+  )]
+  async fn resolve(
+    self,
+    WriteArgs { user }: &WriteArgs,
+  ) -> mogh_error::Result<ExposeServiceResult> {
+    require_admin(user, "make services public")?;
+    expose(
+      ExposeRequest {
+        target: self.target,
+        service: self.service,
+        prefix: self.prefix,
+        zone: self.zone,
+        port: self.port,
+        adopt_conflicts: self.adopt_conflicts,
+      },
+      user,
+    )
+    .await
+    .map_err(|e| {
+      e.log("ExposeService");
+      bad_request(e)
+    })
+  }
+}
+
+impl Resolve<WriteArgs> for UnexposeService {
+  #[instrument(
+    "UnexposeService",
+    skip_all,
+    fields(operator = user.id, service = self.service)
+  )]
+  async fn resolve(
+    self,
+    WriteArgs { user }: &WriteArgs,
+  ) -> mogh_error::Result<Vec<String>> {
+    require_admin(user, "stop public access")?;
+    unexpose(&self.target, &self.service, user)
+      .await
+      .map_err(|e| {
+        e.log("UnexposeService");
+        bad_request(e)
+      })
+  }
+}
+
 impl Resolve<WriteArgs> for EnableServerTunnel {
   #[instrument(
     "EnableServerTunnel",
@@ -82,7 +133,7 @@ impl Resolve<WriteArgs> for EnableServerTunnel {
     self,
     WriteArgs { user }: &WriteArgs,
   ) -> mogh_error::Result<ServerTunnel> {
-    require_admin(user, "open server tunnels with")?;
+    require_admin(user, "open server connections")?;
     tunnel::enable(
       EnableRequest {
         server: self.server,
@@ -109,7 +160,7 @@ impl Resolve<WriteArgs> for DisableServerTunnel {
     self,
     WriteArgs { user }: &WriteArgs,
   ) -> mogh_error::Result<ServerTunnel> {
-    require_admin(user, "close server tunnels with")?;
+    require_admin(user, "close server connections")?;
     tunnel::disable(
       &self.server,
       self.delete_remote.unwrap_or(true),
@@ -196,7 +247,7 @@ fn require_admin(
     Ok(())
   } else {
     Err(
-      anyhow!("Only admins can {what} domain accounts")
+      anyhow!("Only admins can {what}")
         .status_code(StatusCode::FORBIDDEN),
     )
   }
@@ -231,7 +282,7 @@ impl Resolve<WriteArgs> for CreateDomainAccount {
     self,
     WriteArgs { user }: &WriteArgs,
   ) -> mogh_error::Result<DomainAccount> {
-    require_admin(user, "create")?;
+    require_admin(user, "create domain accounts")?;
     if self.name.trim().is_empty() {
       return Err(
         anyhow!("Name cannot be empty")
@@ -291,7 +342,7 @@ impl Resolve<WriteArgs> for UpdateDomainAccount {
     self,
     WriteArgs { user }: &WriteArgs,
   ) -> mogh_error::Result<DomainAccount> {
-    require_admin(user, "update")?;
+    require_admin(user, "update domain accounts")?;
     let account = accounts::find_by_id_or_name(&self.id)
       .await
       .map_err(|e| e.into_api())?
@@ -359,7 +410,7 @@ impl Resolve<WriteArgs> for DeleteDomainAccount {
     self,
     WriteArgs { user }: &WriteArgs,
   ) -> mogh_error::Result<DomainAccount> {
-    require_admin(user, "delete")?;
+    require_admin(user, "delete domain accounts")?;
     let account = accounts::find_by_id_or_name(&self.id)
       .await
       .map_err(|e| e.into_api())?

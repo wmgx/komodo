@@ -77,7 +77,7 @@ pub(super) async fn discover_with(
     Ok(accounts) => accounts,
     Err(e) if e.code == code::AUTH_FAILED => {
       out.warnings.push(
-        "token 缺少读取 Cloudflare 账号的权限，无法列出隧道".into(),
+        "The token cannot read Cloudflare accounts, so tunnels cannot be listed. Add the Account read permission to the token".into(),
       );
       return Ok(out);
     }
@@ -97,7 +97,7 @@ pub(super) async fn discover_with(
       }
       Err(e) if e.code == code::AUTH_FAILED => {
         out.warnings.push(format!(
-          "token 缺少 Cloudflare Tunnel 权限，无法列出账号 {account_name} 的隧道"
+          "The token has no Cloudflare Tunnel permission, so tunnels of account {account_name} cannot be listed. Add Account - Cloudflare Tunnel - Edit to the token"
         ));
       }
       Err(e) => return Err(e),
@@ -131,15 +131,15 @@ fn tunnel_field(
   key: &str,
 ) -> Result<String, ProviderError> {
   match entry.get(key) {
-    None | Some(Value::Null) => {
-      Err(ProviderError::invalid(format!("隧道 #{n} 缺少 {key}")))
-    }
-    Some(Value::String(s)) if s.trim().is_empty() => {
-      Err(ProviderError::invalid(format!("隧道 #{n} 的 {key} 为空")))
-    }
+    None | Some(Value::Null) => Err(ProviderError::invalid(format!(
+      "Tunnel #{n} is missing {key}"
+    ))),
+    Some(Value::String(s)) if s.trim().is_empty() => Err(
+      ProviderError::invalid(format!("Tunnel #{n}: {key} is empty")),
+    ),
     Some(Value::String(s)) => Ok(s.clone()),
     Some(_) => Err(ProviderError::invalid(format!(
-      "隧道 #{n} 的 {key} 必须是字符串"
+      "Tunnel #{n}: {key} must be a string"
     ))),
   }
 }
@@ -151,13 +151,15 @@ pub(super) fn parse_params(
     return Ok(CloudflareParams::default());
   }
   let Some(obj) = params.as_object() else {
-    return Err(ProviderError::invalid("params 必须是 JSON 对象"));
+    return Err(ProviderError::invalid(
+      "params must be a JSON object",
+    ));
   };
   let list = |key: &str| match obj.get(key) {
     None | Some(Value::Null) => Ok(&[][..]),
     Some(Value::Array(a)) => Ok(a.as_slice()),
     Some(_) => {
-      Err(ProviderError::invalid(format!("{key} 必须是数组")))
+      Err(ProviderError::invalid(format!("{key} must be an array")))
     }
   };
   let mut zones = Vec::new();
@@ -166,7 +168,7 @@ pub(super) fn parse_params(
       Some(z) if !z.is_empty() => zones.push(z.to_string()),
       _ => {
         return Err(ProviderError::invalid(format!(
-          "zones #{} 必须是非空字符串",
+          "zones #{} must be a non-empty string",
           i + 1
         )));
       }
@@ -177,7 +179,7 @@ pub(super) fn parse_params(
     let n = i + 1;
     let Some(entry) = tunnel.as_object() else {
       return Err(ProviderError::invalid(format!(
-        "隧道 #{n} 必须是对象"
+        "Tunnel #{n} must be an object"
       )));
     };
     let managed = match entry.get("managed") {
@@ -185,7 +187,7 @@ pub(super) fn parse_params(
       Some(Value::Bool(b)) => *b,
       Some(_) => {
         return Err(ProviderError::invalid(format!(
-          "隧道 #{n} 的 managed 必须是布尔值"
+          "Tunnel #{n}: managed must be a boolean"
         )));
       }
     };
@@ -200,7 +202,7 @@ pub(super) fn parse_params(
         Some(Value::String(_)) => None,
         Some(_) => {
           return Err(ProviderError::invalid(format!(
-            "隧道 #{n} 的 server 必须是字符串"
+            "Tunnel #{n}: server must be a string"
           )));
         }
       },
@@ -212,7 +214,7 @@ pub(super) fn parse_params(
     Some(Value::String(s)) => Some(s.trim().to_string()),
     Some(_) => {
       return Err(ProviderError::invalid(
-        "cloudflared_image 必须是字符串",
+        "cloudflared_image must be a string",
       ));
     }
   };
@@ -230,7 +232,7 @@ fn validate_params(params: &JsonValue) -> Result<(), ProviderError> {
     let n = i + 1;
     if !names.insert(tunnel.name.as_str()) {
       return Err(ProviderError::invalid(format!(
-        "隧道名称重复：{}",
+        "Duplicate tunnel name: {}",
         tunnel.name
       )));
     }
@@ -240,7 +242,7 @@ fn validate_params(params: &JsonValue) -> Result<(), ProviderError> {
     ] {
       if segment(value).is_err() {
         return Err(ProviderError::invalid(format!(
-          "隧道 #{n} 的 {key} 含非法字符，请从列表中选择"
+          "Tunnel #{n}: {key} has invalid characters, pick it from the list"
         )));
       }
     }
@@ -676,14 +678,14 @@ mod tests {
       err(
         json!({"tunnels": [{"account_id": "a", "tunnel_id": "t"}]})
       ),
-      "隧道 #1 缺少 name"
+      "Tunnel #1 is missing name"
     );
     assert!(
       err(json!({"tunnels": [
         {"name": "ok", "account_id": "a", "tunnel_id": "t"},
         {"name": "x", "account_id": "a", "tunnel_id": "<tunnel uuid>"}
       ]}))
-      .starts_with("隧道 #2 的 tunnel_id 含非法字符")
+      .starts_with("Tunnel #2: tunnel_id has invalid characters")
     );
     assert!(err(json!({"zones": "a.com"})).contains("zones"));
     // DNS only is fine

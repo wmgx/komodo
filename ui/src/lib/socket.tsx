@@ -351,6 +351,7 @@ function onUpdate(
         ["ListDomains"],
         ["ListFullDomains"],
         ["ListServiceDomains"],
+        ["ListServices"],
         ["GetDomain"],
       );
     }

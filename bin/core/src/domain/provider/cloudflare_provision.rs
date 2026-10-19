@@ -17,6 +17,11 @@ use super::{
 };
 
 const DEFAULT_IMAGE: &str = "cloudflare/cloudflared:latest";
+/// Registry mirrors for hosts which cannot reach Docker Hub.
+const MIRROR_IMAGES: [&str; 2] = [
+  "docker.1ms.run/cloudflare/cloudflared:latest",
+  "docker.m.daocloud.io/cloudflare/cloudflared:latest",
+];
 const COMMAND: &str = "tunnel --no-autoupdate run";
 
 pub(super) struct CloudflareProvision {
@@ -42,10 +47,10 @@ impl CloudflareProvision {
     match accounts.len() {
       1 => Ok(accounts.remove(0).0),
       0 => Err(ProviderError::invalid(
-        "token 看不到任何 Cloudflare 账号，请检查 token 权限（账户 - Cloudflare Tunnel - 编辑）",
+        "The token cannot see any Cloudflare account. Check its permissions (Account - Cloudflare Tunnel - Edit)",
       )),
       _ => Err(ProviderError::invalid(format!(
-        "token 能访问多个 Cloudflare 账号（{}），请先在账号参数 tunnels 里登记一条已有隧道以确定用哪个",
+        "The token can see several Cloudflare accounts ({}). Register an existing tunnel in the account params to choose one",
         accounts
           .iter()
           .map(|(_, n)| n.as_str())
@@ -94,6 +99,13 @@ impl ProvisionProvider for CloudflareProvision {
       .cloudflared_image
       .clone()
       .unwrap_or_else(|| DEFAULT_IMAGE.to_string())
+  }
+
+  fn fallback_images(&self) -> Vec<String> {
+    std::iter::once(DEFAULT_IMAGE)
+      .chain(MIRROR_IMAGES)
+      .map(String::from)
+      .collect()
   }
 
   fn registered(&self, server: &ServerRef) -> Option<TunnelHandle> {

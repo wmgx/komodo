@@ -1,7 +1,8 @@
 import { useInvalidate, useRead, useSetTitle, useWrite } from "@/lib/hooks";
 import { ICONS } from "@/lib/icons";
 import { ConfirmButton, DataTable, Section, SortableHeader } from "mogh_ui";
-import { Badge, Group, Stack, Text } from "@mantine/core";
+import { Anchor, Badge, Group, Stack, Text } from "@mantine/core";
+import { Link } from "react-router-dom";
 import { notifications } from "@mantine/notifications";
 import DomainAccountForm from "./form";
 
@@ -22,7 +23,7 @@ export default function SettingsDomainAccounts() {
       <Section
         title="Domain Accounts"
         icon={<ICONS.Domain size="1.3rem" />}
-        description="Provider credentials used by Domains to manage DNS records and tunnels. Tokens are write-only."
+        description="Add a Cloudflare account once. Then open Services and click Make public. Tokens are write-only."
       >
         <Group>
           <DomainAccountForm />
@@ -94,6 +95,13 @@ export default function SettingsDomainAccounts() {
             },
           ]}
         />
+        <Text fz="sm" c="dimmed">
+          Advanced:{" "}
+          <Anchor component={Link} to="/domains" fz="sm">
+            Domains
+          </Anchor>{" "}
+          (every address Komodo manages, with plans and details)
+        </Text>
       </Section>
     </Stack>
   );

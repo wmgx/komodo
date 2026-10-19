@@ -38,8 +38,9 @@ export const RESOURCE_TARGETS = [
 
 export const SETTINGS_RESOURCES: UsableResource[] = ["Builder", "Alerter"];
 
+// Domains are reached through Services and Settings -> Domains.
 export const SIDEBAR_RESOURCES: UsableResource[] = RESOURCE_TARGETS.filter(
-  (target) => !SETTINGS_RESOURCES.includes(target),
+  (target) => !SETTINGS_RESOURCES.includes(target) && target !== "Domain",
 );
 
 export const ResourceComponents: {

@@ -7,7 +7,8 @@ use typeshare::typeshare;
 use crate::entities::{
   JsonValue, ResourceTarget,
   domain::{
-    _PartialDomainConfig, Domain, DomainMode, ServiceDomainResult,
+    _PartialDomainConfig, Domain, DomainMode, ExposeServiceResult,
+    ServiceDomainResult,
   },
   domain_account::{DomainAccount, ServerTunnel},
   update::Update,
@@ -63,6 +64,63 @@ pub struct AddServiceDomain {
 
 #[typeshare]
 pub type AddServiceDomainResponse = ServiceDomainResult;
+
+//
+
+/// **Admin only.** Make a Deployment / Stack service reachable from the
+/// internet in one call: opens the connection of its Server when needed,
+/// then adds `<prefix>.<zone>` pointing at the service.
+/// May take a minute the first time on a Server.
+/// Response: [ExposeServiceResult].
+#[typeshare]
+#[derive(Serialize, Deserialize, Debug, Clone, Resolve)]
+#[empty_traits(KomodoWriteRequest)]
+#[response(ExposeServiceResponse)]
+#[error(mogh_error::Error)]
+pub struct ExposeService {
+  /// Deployment or Stack (id or name).
+  pub target: ResourceTarget,
+  /// Service name, required for Stacks.
+  #[serde(default)]
+  pub service: String,
+  /// Subdomain, eg. `grafana`. Defaults to the service name.
+  #[serde(default)]
+  pub prefix: Option<String>,
+  /// Domain to put it under, eg. `example.com`.
+  /// Optional when there is only one.
+  #[serde(default)]
+  pub zone: Option<String>,
+  /// Published port. Chosen automatically when 0.
+  #[serde(default)]
+  pub port: u16,
+  /// Overwrite existing remote records which Komodo does not own.
+  #[serde(default)]
+  pub adopt_conflicts: bool,
+}
+
+#[typeshare]
+pub type ExposeServiceResponse = ExposeServiceResult;
+
+//
+
+/// **Admin only.** Stop public access to a Deployment / Stack service:
+/// removes its public addresses. Response: [UnexposeServiceResponse].
+#[typeshare]
+#[derive(Serialize, Deserialize, Debug, Clone, Resolve)]
+#[empty_traits(KomodoWriteRequest)]
+#[response(UnexposeServiceResponse)]
+#[error(mogh_error::Error)]
+pub struct UnexposeService {
+  /// Deployment or Stack (id or name).
+  pub target: ResourceTarget,
+  /// Service name, required for Stacks.
+  #[serde(default)]
+  pub service: String,
+}
+
+/// Hostnames which were removed.
+#[typeshare]
+pub type UnexposeServiceResponse = Vec<String>;
 
 //
 

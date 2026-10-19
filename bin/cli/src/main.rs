@@ -59,6 +59,9 @@ async fn app() -> anyhow::Result<()> {
     args::Command::Domain { command } => {
       command::domain::handle(command).await
     }
+    args::Command::Service { command } => {
+      command::domain::handle_service(command).await
+    }
     args::Command::Create { command } => {
       command::create::handle(command).await
     }

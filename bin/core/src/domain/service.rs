@@ -58,13 +58,32 @@ fn single_host_port(ports: &str) -> u16 {
   }
 }
 
+/// The Server with the address its services are reached at.
+pub fn server_info(server_id: &str) -> Option<ServerInfo> {
+  let all = all_resources_cache().load();
+  let server =
+    find_by_id_or_name(&all.servers, server_id, |s| &s.name)?;
+  let address = if server.config.external_address.is_empty() {
+    &server.config.address
+  } else {
+    &server.config.external_address
+  };
+  Some(ServerInfo {
+    server: ServerRef {
+      id: server.id.clone(),
+      name: server.name.clone(),
+    },
+    host: host_of(address),
+  })
+}
+
 pub fn resolve_target(
   target: &ResourceTarget,
   service: &str,
 ) -> Result<ResolvedTarget, DomainError> {
   let all = all_resources_cache().load();
   let missing = |kind: &str, id: &str| {
-    DomainError::invalid(format!("{kind} '{id}' 不存在"))
+    DomainError::invalid(format!("{kind} '{id}' does not exist"))
   };
   let (target, service, server_id, detected_port) = match target {
     ResourceTarget::Deployment(id) => {
@@ -82,7 +101,7 @@ pub fn resolve_target(
         .ok_or_else(|| missing("Stack", id))?;
       if service.is_empty() {
         return Err(DomainError::invalid(
-          "Stack 需要指定 service（compose 里的服务名）",
+          "Name the compose service of the Stack",
         ));
       }
       (
@@ -94,27 +113,11 @@ pub fn resolve_target(
     }
     _ => {
       return Err(DomainError::invalid(
-        "target 必须是 Deployment 或 Stack",
+        "The target must be a Deployment or a Stack",
       ));
     }
   };
-  let server =
-    find_by_id_or_name(&all.servers, &server_id, |s| &s.name).map(
-      |server| {
-        let address = if server.config.external_address.is_empty() {
-          &server.config.address
-        } else {
-          &server.config.external_address
-        };
-        ServerInfo {
-          server: ServerRef {
-            id: server.id.clone(),
-            name: server.name.clone(),
-          },
-          host: host_of(address),
-        }
-      },
-    );
+  let server = server_info(&server_id);
   Ok(ResolvedTarget {
     target,
     service,
@@ -212,7 +215,7 @@ pub async fn add_service_domain(
     .map_err(DomainError::internal)?;
   if let Some(existing) = exists {
     return Err(DomainError::invalid(format!(
-      "主机名 '{hostname}' 已被 Domain '{}' 使用，请直接修改或删除它。",
+      "'{hostname}' is already used by '{}'. Pick another name, or stop public access of that service first.",
       existing.name
     )));
   }

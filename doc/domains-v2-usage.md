@@ -1,8 +1,8 @@
-# 域名管理 v2 试用指南（Cloudflare）
+# 让服务从公网访问：3 步
 
-目标：给服务器开通隧道，再用一个测试子域名（下文用 `komodo-test.example.com`）走完 创建 → plan → apply → 验证 → 删除。
+你只需要关心服务。Komodo 会自己决定怎么连通（隧道、DNS 记录、cloudflared 都是自动的）。
 
-## 1. 创建权限收窄的 Cloudflare API token
+## 1. 建 Cloudflare token，在 Settings 里添加账号
 
 Cloudflare 控制台 -> My Profile -> API Tokens -> Create Custom Token，最小权限：
 
@@ -12,85 +12,45 @@ Cloudflare 控制台 -> My Profile -> API Tokens -> Create Custom Token，最小
 | 区域 -> DNS | 编辑 |
 | 帐户 -> Cloudflare Tunnel | 编辑 |
 
-- 区域资源：包括 -> 特定区域 -> 只选目标 zone（如 `example.com`）。
-- 帐户资源：只选隧道所在的账号。
-- 只用 DNS、不用隧道时可不加「Cloudflare Tunnel」；发现时会提示缺少隧道权限，不影响保存。
+区域资源只选要用的域名，帐户资源只选你的账号。
 
-## 2. 在 UI 创建 Domain 账号（需管理员）
+然后在 Komodo：Settings -> Domains -> New Account（需管理员）：填 Name、Kind 选 `cloudflare`、粘贴 token，点「Read from Cloudflare」确认能读到域名，点 Create。隧道不用勾选，之后会自动创建。
 
-Settings -> Domains -> New Account，不需要手写 JSON：
+## 2. 打开 Services
 
-1. 填 Name（如 `cf-main`）、Kind 选 `cloudflare`、Token 粘贴上一步的 token（保存后不再显示）。
-2. 点「Read from Cloudflare」（用表单里的 token 预览，此时不会保存任何东西）。
-3. Zones：勾选允许使用的 zone；一个都不勾表示不限制，token 能访问的 zone 都可用。
-4. Tunnels：勾选要启用的隧道，本地名称默认取 Cloudflare 上的隧道名，可修改；可选绑定它所在的 Komodo Server（用于按 Deployment/Stack 所在 Server 自动选隧道，只有一条隧道时可不选）。账号 ID、隧道 ID 自动填写。
-5. 点 Create。读取失败或有警告（如缺少隧道权限）时，仍可保存并只使用 DNS。
+侧边栏 **Services**：一张表列出所有服务器上的 Stack 服务和 Deployment，包括状态、已发布端口、局域网地址（LAN URL，可点）和公网地址（Public URL，可点）。可按 Server 过滤、搜索。
 
-之后编辑账号会自动用已保存的 token 重新读取；Token 留空表示不修改。非 Cloudflare 的 Kind（无结构化表单）才会显示折叠的「Advanced: params (JSON)」。
+Stack / Deployment 详情页的 **Access** 区块显示同样的信息。
 
-## 3. 最短流程
+## 3. 点 Make public
 
-1. 创建 token（第 1 节，开通隧道需要「帐户 - Cloudflare Tunnel - 编辑」）并在 Settings -> Domains 建账号（第 2 节，隧道不用勾选，开通时会自动创建）。
-2. 给服务器开通隧道，二选一：
-   - 在服务页面点 Add domain，弹窗提示「这台服务器还没有隧道」时点 **为这台服务器开通隧道**；
-   - 或打开 Server 详情页的「Cloudflare Tunnel」区块点 **开通隧道**。
-   
-   确认框里可以改 cloudflared 镜像（VPS 访问不了 Docker Hub 时填镜像源，如 `docker.1ms.run/cloudflare/cloudflared:latest`，会记在账号上，下次自动带出）。点开通后 Komodo 会创建隧道、在该服务器上部署名为 `cloudflared-<服务器名>` 的 Deployment，几十秒内状态变为 healthy。
-3. 在服务页面 **Add domain**（第 4 节），弹窗会自动走 Tunnel。
-4. 用域名从外网访问。
+1. 点该行的 **Make public**。
+2. 弹窗只有一个输入：子域名，默认是服务名（如 `grafana`），后缀（如 `.example.com`）自动带出。有多个域名时才出现下拉；有多个端口时才出现端口下拉，默认选最像网页的端口（80、8080、3000、9120 等）。
+3. 点确定。Komodo 依次：开通这台服务器的连接（只在该服务器第一次时做，约 1 分钟）-> 配置地址 -> 完成，并显示可点击的 `https://...` 链接。
 
-关闭：Server 详情页「Cloudflare Tunnel」区块点 **关闭隧道**（需要先删掉使用它的域名）。CLI：`km domain tunnel enable|disable|status <server>`。token 存放方式与残余风险见设计文档 6.2。
+取消公网访问：同一位置点 **Stop public access**。删除服务时，确认框里勾选「Also stop public access」会一并清理。
 
-## 4. 在服务页面添加域名
+只有远端已存在同名、且不归 Komodo 管理的记录时才会弹出确认。
 
-1. 打开 Stack 或 Deployment 详情页，找到「Domains」区块，点 **Add domain**。
-2. 填主机名前缀（如 `app`），在下拉里选 zone（只有一个时自动选中）。只允许字母、数字、连字符，不能有下划线（`home_komodo` 要写成 `home-komodo`）。
-3. Stack 选 service；端口自动从已发布端口读取（只有一个时自动选中，读不到可手输）。
-4. 看弹窗里的提示：有隧道会说明走隧道；没有隧道则解析到服务器地址，若是内网 IP 会提示「只能在局域网访问，想从外网访问需先给服务器开通隧道」。
-5. 点 **Add**。一步完成：创建 Domain 并 apply。只有远端已有不归 Komodo 管的同名记录时才会弹出确认，列出将被覆盖的对象。
+### 服务器连不上 Docker Hub？
 
-区块里会出现可点击的链接、接入方式（Tunnel / DNS）、状态（ready / drifted / error，附人话原因）和删除按钮。接入方式自动决定：服务所在 Server 在账号里绑定了隧道则走 Tunnel，否则走 DNS；需要强制时在弹窗「高级选项」里覆盖。
+不用管。拉取 cloudflared 失败时，Komodo 会自动依次换 `docker.1ms.run`、`docker.m.daocloud.io` 镜像源重试，成功后记住可用的镜像，下次直接使用。
 
-Tunnel 的规则是 `hostname -> http://localhost:<发布端口>`，默认假定 cloudflared 以 host 网络运行在该服务所在的服务器上。DNS 模式没有端口转发，链接是 `http://<hostname>:<端口>`。
-
-手工方式（高级）：侧边栏 Domains -> New，在 Service 里选目标和端口，必要时展开 Advanced 填 DNS 记录 / 隧道规则，保存后在 Plan 区块 Preview plan -> Apply。
-
-## 5. 验证
-
-- Cloudflare 控制台：DNS 里出现 `komodo-test` 的 CNAME（comment 为 `komodo:<id>`），隧道的 Public Hostname 里出现对应规则。
-- 命令行：`dig +short komodo-test.example.com`，以及 `curl -I https://komodo-test.example.com`（需本机 8080 有服务）。
-- 再点一次 Preview plan，应全是 Noop。
-
-## 6. 删除并确认远端已清理
-
-1. 在服务页面 Domains 区块点删除（或在 Domain 页面删除该资源）（On Delete 默认 Cleanup，会先清远端；失败则资源不会被删除，需修复后重试）。
-2. 在 Cloudflare 确认 CNAME 与隧道规则都已消失，且隧道里其它规则、catch-all 保持不变。
-
-## 等价 CLI
-
-先配置好 `km` 的 host / key / secret。账号管理只能在 UI 做，CLI 不接收 token。
+## 命令行（km）
 
 ```sh
-km domain add stack my-stack app.example.com --service web --port 8080   # 一步完成，有冲突会询问；-y 直接覆盖
-km domain add deployment my-app app.example.com                           # 端口从 Deployment 的 ports 读取
-km list domains
-km domain tunnel enable my-server                  # 为服务器开通隧道（确认后执行，-y 免确认）
-km domain tunnel enable my-server --image docker.1ms.run/cloudflare/cloudflared:latest
-km domain tunnel status my-server                  # 开通状态、cloudflared 部署状态、Cloudflare 连接状态
-km domain tunnel disable my-server                 # 删除 cloudflared 与隧道；--keep-remote 保留 Cloudflare 上的隧道
-km domain plan komodo-test            # 加 --json 输出原始 JSON
-km domain status komodo-test          # 加 --json 输出原始 JSON
-km domain apply komodo-test           # 先显示 plan，回车确认
-km domain apply komodo-test --plan-id <plan_id> -y   # 只应用审阅过的 plan，免确认
-km domain apply komodo-test --adopt-conflicts        # 有 Conflict 时接管已有记录
-km execute apply-domain komodo-test   # 等价的通用执行命令
+km service list                      # 加 --server <名称>、--json
+km service expose grafana            # Deployment；Stack 服务写成 my-stack/web
+km service expose my-stack/web app   # 指定子域名；--port 指定端口，--zone 指定域名，-y 免确认覆盖
+km service unexpose grafana
 ```
+
+高级：`km domain ...`（plan / apply / status / tunnel）仍可用，侧边栏不再有 Domains，入口在 Settings -> Domains 底部的「Advanced: Domains」链接，路由 `/domains` 保留。
 
 ## 常见问题
 
-- `AuthFailed` / `ZoneNotFound`：token 权限或授权范围不对，或 hostname 不在 `params.zones` 内。
-- `TunnelAmbiguous`：显式填写 Tunnel 名。apply 超时后出现 Conflict：确认是自己的规则后用 `--adopt-conflicts`。
-- 删除 Stack / Deployment 时，确认框会列出绑定的域名，可勾选「同时删除这些域名」；不勾选则 Domain 保留，状态显示「目标服务已不存在」。
-- 「DNS 解析到内网 IP」：只能局域网访问。外网访问需要隧道：在 Add domain 弹窗或 Server 页面一键开通。
-- 开通后状态一直是「未连接 / down」：到 `cloudflared-<服务器名>` 这个 Deployment 看日志；多半是服务器拉不到镜像（改用镜像源后再点开通重试）或服务器出站访问不了 Cloudflare。
-- 开通中途失败：直接再点一次开通即可继续，已创建的隧道不会重复创建；创建隧道后失败的步骤会自动删掉新建的隧道。
+- **Make public 提示没有可用域名**：Settings -> Domains 还没有账号，或 token 看不到任何域名。
+- **提示没有已发布端口**：服务需要用 `ports` 发布一个宿主机端口（`8080:80`）。公网转发的目标是 `http://localhost:<宿主机端口>`。
+- **Server 页面「Public access: ...」一直不是 connected**：看 `cloudflared-<服务器名>` 这个 Deployment 的日志，多半是服务器出站访问不了 Cloudflare。再点一次 Make public 会继续未完成的步骤，已创建的隧道不会重复创建。
+- **关闭某台服务器的公网连接**：Server 页面「Public access」一行点 Disable（需要先对该服务器上的服务全部 Stop public access）。
+- 状态 `drifted` / `error`：Access 区块的 Details 里有原因；多数情况再点一次 Make public 即可修复。

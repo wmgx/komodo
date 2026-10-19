@@ -6,7 +6,9 @@ use typeshare::typeshare;
 
 use crate::entities::{
   U64,
-  domain::{Domain, DomainListItem, DomainPlan, DomainQuery},
+  domain::{
+    Domain, DomainListItem, DomainPlan, DomainQuery, ServiceItem,
+  },
   domain_account::{
     DomainAccount, DomainDiscovery, DomainProviderKind, ServerTunnel,
   },
@@ -69,6 +71,25 @@ pub struct ListServiceDomains {
 
 #[typeshare]
 pub type ListServiceDomainsResponse = Vec<DomainListItem>;
+
+//
+
+/// All Deployments and Stack services the user can read, with state,
+/// published ports, LAN addresses and public addresses. Reads caches only.
+/// Response: [ListServicesResponse].
+#[typeshare]
+#[derive(Serialize, Deserialize, Debug, Clone, Default, Resolve)]
+#[empty_traits(KomodoReadRequest)]
+#[response(ListServicesResponse)]
+#[error(mogh_error::Error)]
+pub struct ListServices {
+  /// Only services on this Server (id or name).
+  #[serde(default)]
+  pub server: Option<String>,
+}
+
+#[typeshare]
+pub type ListServicesResponse = Vec<ServiceItem>;
 
 //
 

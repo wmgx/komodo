@@ -4,17 +4,20 @@ use comfy_table::{Attribute, Cell, Table};
 use komodo_client::{
   api::{
     execute::ApplyDomain,
-    read::{GetDomain, GetDomainPlan, GetServerTunnel},
+    read::{GetDomain, GetDomainPlan, GetServerTunnel, ListServices},
     write::{
       AddServiceDomain, DisableServerTunnel, EnableServerTunnel,
+      ExposeService, UnexposeService,
     },
   },
   entities::{
     ResourceTarget,
     config::cli::args::domain::{
       DomainAddArgs, DomainAddKind, DomainApplyArgs, DomainCommand,
-      DomainPlanArgs, DomainStatusArgs, TunnelCommand,
-      TunnelDisableArgs, TunnelEnableArgs, TunnelStatusArgs,
+      DomainPlanArgs, DomainStatusArgs, ServiceCommand,
+      ServiceExposeArgs, ServiceListArgs, ServiceUnexposeArgs,
+      TunnelCommand, TunnelDisableArgs, TunnelEnableArgs,
+      TunnelStatusArgs,
     },
     domain::{ChangeAction, DomainPlan, DomainReason, DomainStatus},
     domain_account::{ServerTunnel, ServerTunnelState},
@@ -36,6 +39,157 @@ pub async fn handle(command: &DomainCommand) -> anyhow::Result<()> {
       TunnelCommand::Status(args) => tunnel_status(args).await,
     },
   }
+}
+
+pub async fn handle_service(
+  command: &ServiceCommand,
+) -> anyhow::Result<()> {
+  match command {
+    ServiceCommand::List(args) => service_list(args).await,
+    ServiceCommand::Expose(args) => service_expose(args).await,
+    ServiceCommand::Unexpose(args) => service_unexpose(args).await,
+  }
+}
+
+/// `name` is a Deployment, `stack/service` a Stack service.
+fn parse_service(input: &str) -> (ResourceTarget, String) {
+  match input.split_once('/') {
+    Some((stack, service)) => (
+      ResourceTarget::Stack(stack.to_string()),
+      service.to_string(),
+    ),
+    None => {
+      (ResourceTarget::Deployment(input.to_string()), String::new())
+    }
+  }
+}
+
+async fn service_list(args: &ServiceListArgs) -> anyhow::Result<()> {
+  let client = super::komodo_client().await?;
+  let services = client
+    .read(ListServices {
+      server: args.server.clone(),
+    })
+    .await
+    .context("Failed to list services")?;
+  if args.json {
+    println!("{}", serde_json::to_string_pretty(&services)?);
+    return Ok(());
+  }
+  let mut table = Table::new();
+  table.load_style(comfy_table::presets::UTF8_HORIZONTAL_ONLY);
+  table.set_header(
+    [
+      "Service",
+      "Server",
+      "State",
+      "Ports",
+      "LAN URL",
+      "Public URL",
+    ]
+    .map(|h| Cell::new(h).add_attribute(Attribute::Bold)),
+  );
+  for s in &services {
+    let name = if s.stack.is_empty() {
+      s.name.clone()
+    } else {
+      format!("{}/{}", s.stack, s.name)
+    };
+    let join = |items: Vec<String>| {
+      if items.is_empty() {
+        "-".to_string()
+      } else {
+        items.join("\n")
+      }
+    };
+    table.add_row(vec![
+      Cell::new(name),
+      Cell::new(&s.server_name),
+      Cell::new(&s.state),
+      Cell::new(join(
+        s.ports
+          .iter()
+          .map(|p| format!("{}->{}", p.host, p.container))
+          .collect(),
+      )),
+      Cell::new(join(
+        s.ports.iter().filter_map(|p| p.lan_url.clone()).collect(),
+      )),
+      Cell::new(join(
+        s.public.iter().map(|p| p.url.clone()).collect(),
+      )),
+    ]);
+  }
+  println!("{table}");
+  Ok(())
+}
+
+async fn service_expose(
+  args: &ServiceExposeArgs,
+) -> anyhow::Result<()> {
+  let client = super::komodo_client().await?;
+  let (target, service) = parse_service(&args.service);
+  println!(
+    "Making '{}' public. The first service on a server takes about a minute...",
+    args.service
+  );
+  let mut adopt = false;
+  loop {
+    let res = client
+      .write(ExposeService {
+        target: target.clone(),
+        service: service.clone(),
+        prefix: args.prefix.clone(),
+        zone: args.zone.clone(),
+        port: args.port,
+        adopt_conflicts: adopt,
+      })
+      .await
+      .context("Failed to make the service public")?;
+    if !res.conflicts.is_empty() {
+      println!(
+        "These records already exist but are not managed by Komodo, they would be overwritten:"
+      );
+      for c in &res.conflicts {
+        println!("  {} {}", c.object.kind, c.object.key);
+      }
+      super::wait_for_enter("overwrite them", args.yes)?;
+      adopt = true;
+      continue;
+    }
+    if let Some(error) = res.error {
+      bail!("{error}");
+    }
+    if let Some(url) = res.url {
+      println!("{} {}", "Public:".green(), url.bold());
+    }
+    return Ok(());
+  }
+}
+
+async fn service_unexpose(
+  args: &ServiceUnexposeArgs,
+) -> anyhow::Result<()> {
+  let client = super::komodo_client().await?;
+  let (target, service) = parse_service(&args.service);
+  if !args.yes {
+    println!(
+      "This removes the public address of '{}'.",
+      args.service
+    );
+    super::wait_for_enter("stop public access", false)?;
+  }
+  let removed = client
+    .write(UnexposeService { target, service })
+    .await
+    .context("Failed to stop public access")?;
+  if removed.is_empty() {
+    println!("'{}' was not public.", args.service);
+  }
+  for hostname in removed {
+    println!("{} {hostname}", "Removed".green());
+  }
+  Ok(())
 }
 
 async fn add(args: &DomainAddArgs) -> anyhow::Result<()> {

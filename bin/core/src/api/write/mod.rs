@@ -167,6 +167,8 @@ pub enum WriteRequest {
   CreateDomain(CreateDomain),
   CopyDomain(CopyDomain),
   AddServiceDomain(AddServiceDomain),
+  ExposeService(ExposeService),
+  UnexposeService(UnexposeService),
   EnableServerTunnel(EnableServerTunnel),
   DisableServerTunnel(DisableServerTunnel),
   DeleteDomain(DeleteDomain),

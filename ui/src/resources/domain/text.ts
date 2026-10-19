@@ -4,32 +4,32 @@ import { Types } from "komodo_client";
 export function reasonText(r: Types.DomainReason): string {
   switch (r.code) {
     case "AccountNotFound":
-      return "域名账号不存在或已被删除，请到 Settings -> Domains 检查。";
+      return "The Cloudflare account was deleted. Check Settings -> Domains.";
     case "ZoneNotFound":
-      return "账号下找不到该主机名所在的域名区域（zone），请检查域名后缀或 token 权限。";
+      return "The account has no matching domain. Check the name and the token permissions.";
     case "TunnelNotFound":
-      return "找不到可用的隧道。想从外网访问，请先给这台服务器开通隧道。";
+      return "No public connection for this server. Make a service public to set one up.";
     case "TunnelAmbiguous":
-      return "这台服务器绑定了多条隧道，无法自动选择，请在账号设置里只保留一条。";
+      return "This server is linked to several tunnels. Keep one in the account settings.";
     case "AuthFailed":
-      return "服务商 token 无效或权限不足，请到 Settings -> Domains 更新。";
+      return "The Cloudflare token is invalid or lacks permissions. Update it in Settings -> Domains.";
     case "RateLimited":
-      return "服务商限流了，请稍后重试。";
+      return "Cloudflare is rate limiting requests. Try again in a moment.";
     case "ProviderUnavailable":
     case "Timeout":
-      return "服务商暂时无法访问或超时，请稍后重试。";
+      return "Cloudflare could not be reached. Try again in a moment.";
     case "RecordMissing":
-      return "DNS 记录被人为删除了，重新应用即可恢复。";
+      return "The DNS record was removed. Make the service public again to restore it.";
     case "RecordChanged":
-      return "DNS 记录被手动改过，重新应用会恢复为 Komodo 的配置。";
+      return "The DNS record was edited by hand. Applying the domain restores it.";
     case "RuleMissing":
-      return "隧道里的转发规则被删除了，重新应用即可恢复。";
+      return "The route was removed from Cloudflare. Applying the domain restores it.";
     case "RuleChanged":
-      return "隧道里的转发规则被手动改过，重新应用会恢复。";
+      return "The route was edited by hand. Applying the domain restores it.";
     case "ForeignRecordConflict":
-      return "远端已有同名记录，且不归 Komodo 管理，确认后才会覆盖。";
+      return "A record with this name already exists and is not managed by Komodo.";
     case "PlanChanged":
-      return "远端内容在预览后发生了变化，请重新预览。";
+      return "Cloudflare changed since the preview. Preview again.";
     default:
       return r.message;
   }
@@ -43,43 +43,25 @@ export function statusReasons(
   return [];
 }
 
-export const TARGET_GONE = "目标服务已不存在";
+export const TARGET_GONE = "Service no longer exists";
 
-/** Returns an error message, or null when the hostname prefix is fine. */
+/** Valid subdomain label, derived from any name. Same rule as the backend. */
+export function toLabel(name: string): string {
+  return name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 63);
+}
+
+/** Returns an error message, or null when the subdomain is fine. */
 export function validatePrefix(prefix: string): string | null {
   if (!prefix) return null;
-  for (const label of prefix.split(".")) {
-    if (!label) return "不能有空的部分（连续的点）";
-    if (label.includes("_"))
-      return `不能包含下划线，请用连字符 - 代替（例如 ${label.replaceAll("_", "-")}）`;
-    if (!/^[a-zA-Z0-9-]+$/.test(label))
-      return "只允许字母、数字和连字符 -";
-    if (label.startsWith("-") || label.endsWith("-"))
-      return "不能以连字符开头或结尾";
-    if (label.length > 63) return "每一段最长 63 个字符";
-  }
+  if (!/^[a-zA-Z0-9-]+$/.test(prefix))
+    return "Use letters, digits and - only";
+  if (prefix.startsWith("-") || prefix.endsWith("-"))
+    return "Cannot start or end with -";
+  if (prefix.length > 63) return "At most 63 characters";
   return null;
-}
-
-export function isPrivateHost(host: string): boolean {
-  const m = host.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
-  if (m) {
-    const [a, b] = [Number(m[1]), Number(m[2])];
-    return (
-      a === 10 ||
-      (a === 172 && b >= 16 && b < 32) ||
-      (a === 192 && b === 168) ||
-      (a === 169 && b === 254) ||
-      (a === 100 && b >= 64 && b < 128)
-    );
-  }
-  const h = host.toLowerCase();
-  return h.startsWith("fc") || h.startsWith("fd") || h.startsWith("fe80");
-}
-
-export function domainLink(config: Types.DomainConfig): string {
-  const tunnel = !!config.ingress?.account;
-  return tunnel || !config.port
-    ? `https://${config.hostname}`
-    : `http://${config.hostname}:${config.port}`;
 }

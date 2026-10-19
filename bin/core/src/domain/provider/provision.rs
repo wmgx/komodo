@@ -40,6 +40,10 @@ pub trait ProvisionProvider: Send + Sync {
   /// remembered image, else the vendor's official one.
   fn default_image(&self) -> String;
 
+  /// Images to try, in order, when the preferred one cannot be pulled
+  /// (eg. the registry is blocked): the official image, then mirrors.
+  fn fallback_images(&self) -> Vec<String>;
+
   /// The tunnel already bound to `server` in the account params.
   fn registered(&self, server: &ServerRef) -> Option<TunnelHandle>;
 
