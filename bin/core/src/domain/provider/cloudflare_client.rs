@@ -268,20 +268,32 @@ impl CloudflareClient {
   }
 
   /// `(id, name)` of the Cloudflare accounts the token can access.
+  /// `/accounts` is empty unless the token can read account settings,
+  /// so the owning accounts of the visible zones are included too.
   pub async fn list_accounts(&self) -> Result<Vec<(String, String)>> {
-    Ok(
-      self
-        .list_pages("/accounts", "accounts")
-        .await?
-        .iter()
-        .filter_map(|a| {
-          Some((
-            a["id"].as_str()?.to_string(),
-            a["name"].as_str().unwrap_or_default().to_string(),
-          ))
-        })
-        .collect(),
-    )
+    let listed = self.list_pages("/accounts", "accounts").await;
+    let zones = self.list_pages("/zones", "zones").await;
+    let mut accounts: Vec<(String, String)> = Vec::new();
+    let mut add = |a: &Value| {
+      let Some(id) = a["id"].as_str() else { return };
+      if !accounts.iter().any(|(existing, _)| existing == id) {
+        accounts.push((
+          id.to_string(),
+          a["name"].as_str().unwrap_or_default().to_string(),
+        ));
+      }
+    };
+    if let Ok(listed) = &listed {
+      listed.iter().for_each(&mut add);
+    }
+    if let Ok(zones) = &zones {
+      zones.iter().for_each(|z| add(&z["account"]));
+    }
+    match (accounts.is_empty(), listed, zones) {
+      (false, _, _) => Ok(accounts),
+      (true, Err(e), _) | (true, _, Err(e)) => Err(e),
+      (true, Ok(_), Ok(_)) => Ok(accounts),
+    }
   }
 
   /// Non deleted tunnels of an account (raw objects).
